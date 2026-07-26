@@ -76,195 +76,296 @@
 ## 该工具有什么用处？
 往输入框里输入字符即可演奏，来一个即兴演奏。(规则：小写字母/数字=白键，Shift+字母（大写）=黑键。)
 
-<script setup>
-import { onMounted, onBeforeUnmount } from 'vue'
+<script>
+if (typeof window !== 'undefined') {
+  // 全局存储当前钢琴实例的所有资源，方便一次性清理
+  let pianoInstance = {
+    audioCtx: null,
+    activeNodes: {},
+    observer: null,
+    inputListeners: {},
+    docListeners: {},
+    winListeners: {},
+    keyListeners: {},
+    isInitialized: false
+  };
 
-// 仅钢琴页执行逻辑（避免其他页面误触发）
-if (!window.location.pathname.includes('/tools/keypiano')) {
-  console.log('非钢琴页，跳过初始化')
-  return
-}
+  // ===== 核心：彻底清理所有残留资源（跳转时必调用）=====
+  const destroyPiano = () => {
+    if (!pianoInstance.isInitialized) return;
+    console.log('🧹 彻底清理旧钢琴实例，防止隔页出声');
 
-// 全局状态（不用Vue响应式，纯原生逻辑）
-let audioCtx = null
-let activeNodes = {}
-let isComposing = false
-let abortController = null // 统一管理所有事件监听，跳转时一键移除
-
-// 频率表（和之前完全一致）
-const FREQ = {
-  '1':261.63,'2':293.66,'3':329.63,'4':349.23,'5':392.00,'6':440.00,'7':493.88,
-  'q':523.25,'Q':554.37,'w':587.33,'W':622.25,'e':659.25,'r':698.46,'R':739.99,
-  't':783.99,'T':830.61,'y':880.00,'Y':932.33,'u':987.77,'i':1046.50,'I':1108.73,
-  'o':1174.66,'O':1244.51,'p':1318.51,'a':1396.91,'A':1479.98,'s':1567.98,'S':1661.22,
-  'd':1760.00,'D':1864.66,'f':1975.53,'g':2093.00,'G':2217.46,'h':2349.32,'H':2489.02,
-  'j':2637.02,'k':2793.83,'K':2959.96,'l':3135.96,'L':3322.44,';':3520.00,':':3729.31,
-  'z':3951.07,'x':4186.01
-}
-
-// 组件挂载时执行（100%客户端执行，SSR不会碰）
-onMounted(() => {
-  console.log('✅ 钢琴组件挂载，初始化逻辑')
-  abortController = new AbortController()
-  const { signal } = abortController
-
-  // 获取DOM元素（ClientOnly确保DOM已存在）
-  const pianoContainer = document.querySelector('.vp-piano')
-  if (!pianoContainer) {
-    console.error('钢琴容器未找到，初始化失败')
-    return
-  }
-  const input = pianoContainer.querySelector('#piano-input')
-  const currentNoteEl = pianoContainer.querySelector('#piano-current-note')
-  const currentFreqEl = pianoContainer.querySelector('#piano-current-freq')
-  const keys = pianoContainer.querySelectorAll('.vp-key[data-k]')
-
-  if (!input || !currentNoteEl || !currentFreqEl || !keys.length) {
-    console.error('钢琴DOM元素不全，初始化失败')
-    return
-  }
-
-  // 初始化音频（首次交互时触发）
-  const initAudio = () => {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-    }
-    if (audioCtx.state === 'suspended') audioCtx.resume()
-    currentFreqEl.textContent = '等待输入...'
-  }
-
-  // 播放逻辑（和之前完全一致）
-  const play = (keyChar) => {
-    if (!FREQ[keyChar] || activeNodes[keyChar]) return
-    initAudio()
-    const now = audioCtx.currentTime
-
-    const mainGain = audioCtx.createGain()
-    mainGain.gain.setValueAtTime(0, now)
-    mainGain.gain.linearRampToValueAtTime(0.3, now + 0.005)
-    mainGain.gain.exponentialRampToValueAtTime(0.05, now + 0.2)
-    mainGain.gain.exponentialRampToValueAtTime(0.001, now + 0.7)
-
-    const oscFundamental = audioCtx.createOscillator()
-    oscFundamental.type = 'sine'
-    oscFundamental.frequency.value = FREQ[keyChar]
-
-    const oscHarmonic2 = audioCtx.createOscillator()
-    oscHarmonic2.type = 'triangle'
-    oscHarmonic2.frequency.value = FREQ[keyChar] * 2
-    const gainHarmonic2 = audioCtx.createGain()
-    gainHarmonic2.gain.value = 0.25
-
-    const oscHarmonic3 = audioCtx.createOscillator()
-    oscHarmonic3.type = 'square'
-    oscHarmonic3.frequency.value = FREQ[keyChar] * 3
-    const gainHarmonic3 = audioCtx.createGain()
-    gainHarmonic3.gain.value = 0.15
-
-    const lowpass = audioCtx.createBiquadFilter()
-    lowpass.type = 'lowpass'
-    lowpass.frequency.value = 4000
-    lowpass.Q.value = 1
-
-    const reverbGain = audioCtx.createGain()
-    reverbGain.gain.value = 0.12
-    const delay = audioCtx.createDelay()
-    delay.delayTime.value = 0.02
-    const feedback = audioCtx.createGain()
-    feedback.gain.value = 0.15
-
-    oscFundamental.connect(mainGain)
-    oscHarmonic2.connect(gainHarmonic2).connect(mainGain)
-    oscHarmonic3.connect(gainHarmonic3).connect(mainGain)
-    mainGain.connect(lowpass)
-    lowpass.connect(audioCtx.destination)
-    lowpass.connect(delay).connect(feedback).connect(delay)
-    delay.connect(reverbGain).connect(audioCtx.destination)
-
-    oscFundamental.start(now)
-    oscHarmonic2.start(now)
-    oscHarmonic3.start(now)
-
-    activeNodes[keyChar] = { oscillators: [oscFundamental, oscHarmonic2, oscHarmonic3], mainGain }
-    currentNoteEl.textContent = keyChar.length === 1 ? keyChar.toUpperCase() + (/[A-G]/.test(keyChar) && keyChar === keyChar.toUpperCase() ? '#' : '') : '--'
-    currentFreqEl.textContent = `${FREQ[keyChar].toFixed(2)} Hz`
-    pianoContainer.querySelector(`.vp-key[data-k="${keyChar}"]`)?.classList.add('active')
-
-    setTimeout(() => stop(keyChar), 700)
-  }
-
-  // 停止逻辑
-  const stop = (keyChar) => {
-    const node = activeNodes[keyChar]
-    if (!node) return
-    const now = audioCtx.currentTime
-    node.mainGain.gain.cancelScheduledValues(now)
-    node.mainGain.gain.setValueAtTime(node.mainGain.gain.value, now)
-    node.mainGain.gain.linearRampToValueAtTime(0, now + 0.03)
-    node.oscillators.forEach(osc => osc.stop(now + 0.05))
-    delete activeNodes[keyChar]
-    pianoContainer.querySelector(`.vp-key[data-k="${keyChar}"]`)?.classList.remove('active')
-  }
-
-  // 停止所有声音
-  const stopAll = () => {
-    Object.values(activeNodes).forEach(node => {
+    // 1. 停止所有正在播放的声音，关闭音频上下文
+    Object.values(pianoInstance.activeNodes).forEach(node => {
       try {
-        node.mainGain.gain.cancelScheduledValues(audioCtx?.currentTime)
-        node.oscillators.forEach(osc => osc.stop())
+        node.mainGain.gain.cancelScheduledValues(pianoInstance.audioCtx.currentTime);
+        node.oscillators.forEach(osc => osc.stop());
       } catch (e) {}
-    })
-    activeNodes = {}
+    });
+    if (pianoInstance.audioCtx) {
+      pianoInstance.audioCtx.close().catch(() => {});
+    }
+
+    // 2. 移除所有绑定的事件监听（重点是全局的document/window事件）
+    const removeAllListeners = () => {
+      // 输入框事件
+      const input = document.getElementById('piano-input');
+      if (input && pianoInstance.inputListeners.click) {
+        input.removeEventListener('click', pianoInstance.inputListeners.click);
+        input.removeEventListener('input', pianoInstance.inputListeners.input);
+        input.removeEventListener('compositionstart', pianoInstance.inputListeners.compositionstart);
+        input.removeEventListener('compositionend', pianoInstance.inputListeners.compositionend);
+      }
+      // document全局键盘事件
+      if (pianoInstance.docListeners.keydown) {
+        document.removeEventListener('keydown', pianoInstance.docListeners.keydown);
+        document.removeEventListener('keyup', pianoInstance.docListeners.keyup);
+      }
+      // window事件
+      if (pianoInstance.winListeners.blur) {
+        window.removeEventListener('blur', pianoInstance.winListeners.blur);
+      }
+      // body一次性事件
+      if (pianoInstance.keyListeners.click) {
+        document.body.removeEventListener('click', pianoInstance.keyListeners.click);
+        document.body.removeEventListener('keydown', pianoInstance.keyListeners.keydown);
+      }
+      // 琴键鼠标事件
+      pianoInstance.keyListeners.mouse?.forEach(({ el, events }) => {
+        el.removeEventListener('mousedown', events.mousedown);
+        el.removeEventListener('mouseup', events.mouseup);
+        el.removeEventListener('mouseleave', events.mouseleave);
+      });
+    };
+    removeAllListeners();
+
+    // 3. 断开DOM监听，停止MutationObserver
+    if (pianoInstance.observer) {
+      pianoInstance.observer.disconnect();
+      pianoInstance.observer = null;
+    }
+
+    // 4. 重置所有状态
+    pianoInstance = {
+      audioCtx: null,
+      activeNodes: {},
+      observer: null,
+      inputListeners: {},
+      docListeners: {},
+      winListeners: {},
+      keyListeners: {},
+      isInitialized: false
+    };
+    console.log('✅ 旧钢琴实例已完全销毁，无残留');
+  };
+
+  // ===== 钢琴初始化逻辑（仅当前路径是钢琴页时执行）=====
+  const initPiano = () => {
+    // 不是钢琴页直接跳过，避免误初始化
+    if (!window.location.pathname.includes('/tools/keypiano')) return;
+    // 已经初始化过就不再重复执行
+    if (pianoInstance.isInitialized) return;
+
+    console.log('✅ 钢琴JS启动（当前路径匹配，无残留）');
+    pianoInstance.isInitialized = true;
+
+    // 频率表（完整保留）
+    const FREQ = {
+      '1':261.63,'2':293.66,'3':329.63,'4':349.23,'5':392.00,'6':440.00,'7':493.88,
+      'q':523.25,'Q':554.37,'w':587.33,'W':622.25,'e':659.25,'r':698.46,'R':739.99,
+      't':783.99,'T':830.61,'y':880.00,'Y':932.33,'u':987.77,'i':1046.50,'I':1108.73,
+      'o':1174.66,'O':1244.51,'p':1318.51,'a':1396.91,'A':1479.98,'s':1567.98,'S':1661.22,
+      'd':1760.00,'D':1864.66,'f':1975.53,'g':2093.00,'G':2217.46,'h':2349.32,'H':2489.02,
+      'j':2637.02,'k':2793.83,'K':2959.96,'l':3135.96,'L':3322.44,';':3520.00,':':3729.31,
+      'z':3951.07,'x':4186.01
+    };
+
+    const input = document.getElementById('piano-input');
+    const currentNoteEl = document.getElementById('piano-current-note');
+    const currentFreqEl = document.getElementById('piano-current-freq');
+    const keys = document.querySelectorAll('.vp-key[data-k]');
+    if (!input || !currentNoteEl || !currentFreqEl || !keys.length) return;
+
+    let isComposing = false;
+
+    // 初始化音频
+    const initAudio = () => {
+      if (!pianoInstance.audioCtx) {
+        pianoInstance.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (pianoInstance.audioCtx.state === 'suspended') pianoInstance.audioCtx.resume();
+      currentFreqEl.textContent = '等待输入...';
+    };
+
+    // 播放逻辑
+    const play = (keyChar) => {
+      if (!FREQ[keyChar] || pianoInstance.activeNodes[keyChar]) return;
+      initAudio();
+      const now = pianoInstance.audioCtx.currentTime;
+
+      const mainGain = pianoInstance.audioCtx.createGain();
+      mainGain.gain.setValueAtTime(0, now);
+      mainGain.gain.linearRampToValueAtTime(0.3, now + 0.005);
+      mainGain.gain.exponentialRampToValueAtTime(0.05, now + 0.2);
+      mainGain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+
+      const oscFundamental = pianoInstance.audioCtx.createOscillator();
+      oscFundamental.type = 'sine';
+      oscFundamental.frequency.value = FREQ[keyChar];
+
+      const oscHarmonic2 = pianoInstance.audioCtx.createOscillator();
+      oscHarmonic2.type = 'triangle';
+      oscHarmonic2.frequency.value = FREQ[keyChar] * 2;
+      const gainHarmonic2 = pianoInstance.audioCtx.createGain();
+      gainHarmonic2.gain.value = 0.25;
+
+      const oscHarmonic3 = pianoInstance.audioCtx.createOscillator();
+      oscHarmonic3.type = 'square';
+      oscHarmonic3.frequency.value = FREQ[keyChar] * 3;
+      const gainHarmonic3 = pianoInstance.audioCtx.createGain();
+      gainHarmonic3.gain.value = 0.15;
+
+      const lowpass = pianoInstance.audioCtx.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.value = 4000;
+      lowpass.Q.value = 1;
+
+      const reverbGain = pianoInstance.audioCtx.createGain();
+      reverbGain.gain.value = 0.12;
+      const delay = pianoInstance.audioCtx.createDelay();
+      delay.delayTime.value = 0.02;
+      const feedback = pianoInstance.audioCtx.createGain();
+      feedback.gain.value = 0.15;
+
+      oscFundamental.connect(mainGain);
+      oscHarmonic2.connect(gainHarmonic2).connect(mainGain);
+      oscHarmonic3.connect(gainHarmonic3).connect(mainGain);
+      mainGain.connect(lowpass);
+      lowpass.connect(pianoInstance.audioCtx.destination);
+      lowpass.connect(delay).connect(feedback).connect(delay);
+      delay.connect(reverbGain).connect(pianoInstance.audioCtx.destination);
+
+      oscFundamental.start(now);
+      oscHarmonic2.start(now);
+      oscHarmonic3.start(now);
+
+      pianoInstance.activeNodes[keyChar] = { oscillators: [oscFundamental, oscHarmonic2, oscHarmonic3], mainGain };
+      currentNoteEl.textContent = keyChar.length === 1 ? keyChar.toUpperCase() + (/[A-G]/.test(keyChar) && keyChar === keyChar.toUpperCase() ? '#' : '') : '--';
+      currentFreqEl.textContent = `${FREQ[keyChar].toFixed(2)} Hz`;
+      document.querySelector(`.vp-key[data-k="${keyChar}"]`)?.classList.add('active');
+
+      setTimeout(() => stop(keyChar), 700);
+    };
+
+    // 停止逻辑
+    const stop = (keyChar) => {
+      const node = pianoInstance.activeNodes[keyChar];
+      if (!node) return;
+      const now = pianoInstance.audioCtx.currentTime;
+      node.mainGain.gain.cancelScheduledValues(now);
+      node.mainGain.gain.setValueAtTime(node.mainGain.gain.value, now);
+      node.mainGain.gain.linearRampToValueAtTime(0, now + 0.03);
+      node.oscillators.forEach(osc => osc.stop(now + 0.05));
+      delete pianoInstance.activeNodes[keyChar];
+      document.querySelector(`.vp-key[data-k="${keyChar}"]`)?.classList.remove('active');
+    };
+
+    const stopAll = () => Object.values(pianoInstance.activeNodes).forEach(node => {
+      try {
+        node.mainGain.gain.cancelScheduledValues(pianoInstance.audioCtx.currentTime);
+        node.oscillators.forEach(osc => osc.stop());
+      } catch (e) {}
+    });
+
+    // ===== 保存所有事件监听，方便后续移除 =====
+    // 输入框事件
+    pianoInstance.inputListeners = {
+      click: initAudio,
+      input: (e) => {
+        if (isComposing) return;
+        const addedChars = e.target.value.slice(-1);
+        if (FREQ[addedChars]) play(addedChars);
+      },
+      compositionstart: () => { isComposing = true; },
+      compositionend: () => { isComposing = false; }
+    };
+    input.addEventListener('click', pianoInstance.inputListeners.click);
+    input.addEventListener('input', pianoInstance.inputListeners.input);
+    input.addEventListener('compositionstart', pianoInstance.inputListeners.compositionstart);
+    input.addEventListener('compositionend', pianoInstance.inputListeners.compositionend);
+
+    // document全局键盘事件
+    pianoInstance.docListeners = {
+      keydown: (e) => {
+        if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+        if (FREQ[e.key]) { e.preventDefault(); play(e.key); }
+      },
+      keyup: (e) => { if (FREQ[e.key]) stop(e.key); }
+    };
+    document.addEventListener('keydown', pianoInstance.docListeners.keydown);
+    document.addEventListener('keyup', pianoInstance.docListeners.keyup);
+
+    // window blur事件
+    pianoInstance.winListeners = {
+      blur: stopAll
+    };
+    window.addEventListener('blur', pianoInstance.winListeners.blur);
+
+    // body一次性事件
+    pianoInstance.keyListeners.click = initAudio;
+    pianoInstance.keyListeners.keydown = initAudio;
+    document.body.addEventListener('click', pianoInstance.keyListeners.click, { once: true });
+    document.body.addEventListener('keydown', pianoInstance.keyListeners.keydown, { once: true });
+
+    // 琴键鼠标事件
+    pianoInstance.keyListeners.mouse = [];
+    keys.forEach(keyEl => {
+      const events = {
+        mousedown: () => play(keyEl.dataset.k),
+        mouseup: () => stop(keyEl.dataset.k),
+        mouseleave: () => stop(keyEl.dataset.k)
+      };
+      keyEl.addEventListener('mousedown', events.mousedown);
+      keyEl.addEventListener('mouseup', events.mouseup);
+      keyEl.addEventListener('mouseleave', events.mouseleave);
+      pianoInstance.keyListeners.mouse.push({ el: keyEl, events });
+    });
+  };
+
+  // ===== 监听DOM变化，钢琴容器出现就初始化 =====
+  pianoInstance.observer = new MutationObserver((mutations) => {
+    // 只在钢琴页才处理
+    if (!window.location.pathname.includes('/tools/keypiano')) return;
+    if (pianoInstance.isInitialized) return;
+
+    for (let mutation of mutations) {
+      if (mutation.addedNodes.length) {
+        for (let node of mutation.addedNodes) {
+          if (node.classList?.contains('vp-piano') || node.querySelector?.('.vp-piano')) {
+            initPiano();
+            return;
+          }
+        }
+      }
+    }
+  });
+  pianoInstance.observer.observe(document.body, { childList: true, subtree: true });
+
+  // 双保险：如果DOM已经存在，直接初始化
+  if (window.location.pathname.includes('/tools/keypiano') && document.querySelector('.vp-piano')) {
+    initPiano();
   }
 
-  // ===== 绑定所有事件（用signal统一管理，跳转时一键移除）=====
-  // 输入框事件
-  input.addEventListener('click', initAudio, { signal })
-  input.addEventListener('input', (e) => {
-    if (isComposing) return
-    const addedChars = e.target.value.slice(-1)
-    if (FREQ[addedChars]) play(addedChars)
-  }, { signal })
-  input.addEventListener('compositionstart', () => { isComposing = true }, { signal })
-  input.addEventListener('compositionend', () => { isComposing = false }, { signal })
+  // ===== VitePress路由切换时，先彻底清理旧实例 =====
+  window.addEventListener('vitepress:before-page-unload', () => {
+    destroyPiano();
+  });
 
-  // 全局键盘事件
-  document.addEventListener('keydown', (e) => {
-    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
-    if (FREQ[e.key]) { e.preventDefault(); play(e.key) }
-  }, { signal })
-  document.addEventListener('keyup', (e) => { if (FREQ[e.key]) stop(e.key) }, { signal })
-
-  // 琴键鼠标事件
-  keys.forEach(keyEl => {
-    keyEl.addEventListener('mousedown', () => play(keyEl.dataset.k), { signal })
-    keyEl.addEventListener('mouseup', () => stop(keyEl.dataset.k), { signal })
-    keyEl.addEventListener('mouseleave', () => stop(keyEl.dataset.k), { signal })
-  })
-
-  // 窗口失焦停止所有声音
-  window.addEventListener('blur', stopAll, { signal })
-
-  // 首次交互激活音频（浏览器自动播放策略）
-  document.body.addEventListener('click', initAudio, { signal, once: true })
-  document.body.addEventListener('keydown', initAudio, { signal, once: true })
-})
-
-// 组件销毁时执行（SPA跳转离开页面时自动触发）
-onBeforeUnmount(() => {
-  console.log('🧹 钢琴组件销毁，清理所有资源')
-  // 停止所有声音，关闭音频上下文
-  if (audioCtx) {
-    audioCtx.close().catch(() => {})
-    audioCtx = null
-  }
-  activeNodes = {}
-  // 移除所有事件监听（AbortController一键清理）
-  if (abortController) {
-    abortController.abort()
-    abortController = null
-  }
-})
+  // 页面卸载时兜底清理
+  window.addEventListener('beforeunload', () => {
+    destroyPiano();
+  });
+}
 </script>
 
 <style>
