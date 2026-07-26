@@ -33,42 +33,42 @@
 </div>
 
 <style>
-#container { width:100%; height:520px; background:var(--vp-c-bg); border:1px solid var(--vp-c-divider); border-radius:8px; position:relative; overflow:hidden; margin:24px 0; }
-#container #kv-main { position:absolute; inset:0; bottom:200px; }
-#container #kv-keys { position:absolute; left:0; right:0; bottom:200px; display:flex; flex-direction:column; align-items:center; gap:14px; padding:10px 0; pointer-events:none; }
-#container .kv-row { display:flex; gap:12px; pointer-events:auto; }
-#container .key { min-width:50px; height:50px; border:2px solid var(--vp-c-divider); border-radius:8px; font-weight:bold; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:15px; background:var(--vp-c-bg-soft); color:var(--vp-c-text-1); cursor:pointer; transition:all 0.1s; }
-#container .key.pressed { background:var(--vp-c-brand-dimm); border-color:var(--vp-c-brand); transform:scale(0.96); }
-#container .info-key { background:var(--vp-c-bg-mute) !important; cursor:default; min-width:110px; }
-#container .kps-key .kv-val { color:#ff9f43; font-size:22px; }
-#container .total-key .kv-val { color:#00b96b; font-size:22px; }
-#container #kv-cfg { position:absolute; bottom:0; left:0; right:0; height:200px; background:var(--vp-c-bg-soft); border-top:1px solid var(--vp-c-divider); display:flex; flex-direction:column; }
-#container #kv-cfg-top { flex:1; display:flex; gap:12px; padding:10px; overflow:auto; }
-#container #kv-cfg-bottom { height:80px; display:flex; gap:16px; padding:0 12px; align-items:center; overflow:auto; }
-#container .cfg-item { min-width:72px; padding:6px; border:1px solid var(--vp-c-divider); border-radius:6px; background:var(--vp-c-bg-mute); display:flex; flex-direction:column; align-items:center; gap:3px; position:relative; }
-#container .del-btn { position:absolute; top:-5px; right:-5px; width:15px; height:15px; border-radius:50%; background:var(--vp-c-danger); color:white; border:none; cursor:pointer; font-size:10px; }
-#container .row-btn { width:16px; height:16px; border-radius:2px; border:1px solid var(--vp-c-divider); background:var(--vp-c-bg-soft); cursor:pointer; font-size:8px; }
-#container .row-btn.on { border-color:var(--vp-c-brand); background:var(--vp-c-brand-dimm); }
-#container .span-btn { width:14px; height:14px; border-radius:2px; border:1px solid var(--vp-c-divider); background:var(--vp-c-bg-soft); cursor:pointer; font-size:7px; }
-#container .span-btn.on { border-color:var(--vp-c-brand); background:var(--vp-c-brand-dimm); }
-#container .add-btn { padding:8px 14px; border:2px solid var(--vp-c-brand); background:var(--vp-c-bg-soft); color:var(--vp-c-brand); border-radius:6px; cursor:pointer; }
-#container .kv-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99999; align-items:center; justify-content:center; }
-#container .kv-modal-overlay.show { display:flex; }
-#container .kv-modal-box { background:var(--vp-c-bg-elv); border:1px solid var(--vp-c-divider); border-radius:12px; padding:20px; width:320px; }
-#container .kv-type-btn { flex:1; padding:8px; border:2px solid var(--vp-c-divider); border-radius:4px; cursor:pointer; font-size:11px; text-align:center; }
-#container .kv-type-btn.on { border-color:var(--vp-c-brand); background:var(----vp-c-brand-dimm); }
-#container .kv-btn { flex:1; padding:10px; border:none; border-radius:6px; cursor:pointer; font-weight:bold; }
-#container .kv-btn.cancel { background:var(--vp-c-bg-mute); }
-#container .kv-btn.ok { background:var(--vp-c-brand); color:white; }
-#container .kv-bar { position:absolute; border-radius:2px; pointer-events:none; min-height:2px; }
+/* 所有样式选择器都和容器ID kv-container 对齐，这次绝对没错 */
+#kv-container { width:100%; height:520px; background:var(--vp-c-bg); border:1px solid var(--vp-c-divider); border-radius:8px; position:relative; overflow:hidden; margin:24px 0; }
+#kv-container #kv-main { position:absolute; inset:0; bottom:200px; }
+#kv-container #kv-keys { position:absolute; left:0; right:0; bottom:200px; display:flex; flex-direction:column; align-items:center; gap:14px; padding:10px 0; pointer-events:none; }
+#kv-container .kv-row { display:flex; gap:12px; pointer-events:auto; }
+#kv-container .key { min-width:50px; height:50px; border:2px solid var(--vp-c-divider); border-radius:8px; font-weight:bold; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:15px; background:var(--vp-c-bg-soft); color:var(--vp-c-text-1); cursor:pointer; transition:all 0.1s; }
+#kv-container .key.pressed { background:var(--vp-c-brand-dimm); border-color:var(--vp-c-brand); transform:scale(0.96); }
+#kv-container .info-key { background:var(--vp-c-bg-mute) !important; cursor:default; min-width:110px; }
+#kv-container .kps-key .kv-val { color:#ff9f43; font-size:22px; }
+#kv-container .total-key .kv-val { color:#00b96b; font-size:22px; }
+#kv-container #kv-cfg { position:absolute; bottom:0; left:0; right:0; height:200px; background:var(--vp-c-bg-soft); border-top:1px solid var(--vp-c-divider); display:flex; flex-direction:column; }
+#kv-container #kv-cfg-top { flex:1; display:flex; gap:12px; padding:10px; overflow:auto; }
+#kv-container #kv-cfg-bottom { height:80px; display:flex; gap:16px; padding:0 12px; align-items:center; overflow:auto; }
+#kv-container .cfg-item { min-width:72px; padding:6px; border:1px solid var(--vp-c-divider); border-radius:6px; background:var(--vp-c-bg-mute); display:flex; flex-direction:column; align-items:center; gap:3px; position:relative; }
+#kv-container .del-btn { position:absolute; top:-5px; right:-5px; width:15px; height:15px; border-radius:50%; background:var(--vp-c-danger); color:white; border:none; cursor:pointer; font-size:10px; }
+#kv-container .row-btn { width:16px; height:16px; border-radius:2px; border:1px solid var(--vp-c-divider); background:var(--vp-c-bg-soft); cursor:pointer; font-size:8px; }
+#kv-container .row-btn.on { border-color:var(--vp-c-brand); background:var(--vp-c-brand-dimm); }
+#kv-container .span-btn { width:14px; height:14px; border-radius:2px; border:1px solid var(--vp-c-divider); background:var(--vp-c-bg-soft); cursor:pointer; font-size:7px; }
+#kv-container .span-btn.on { border-color:var(--vp-c-brand); background:var(--vp-c-brand-dimm); }
+#kv-container .add-btn { padding:8px 14px; border:2px solid var(--vp-c-brand); background:var(--vp-c-bg-soft); color:var(--vp-c-brand); border-radius:6px; cursor:pointer; }
+#kv-container .kv-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99999; align-items:center; justify-content:center; }
+#kv-container .kv-modal-overlay.show { display:flex; }
+#kv-container .kv-modal-box { background:var(--vp-c-bg-elv); border:1px solid var(--vp-c-divider); border-radius:12px; padding:20px; width:320px; }
+#kv-container .kv-type-btn { flex:1; padding:8px; border:2px solid var(--vp-c-divider); border-radius:4px; cursor:pointer; font-size:11px; text-align:center; }
+#kv-container .kv-type-btn.on { border-color:var(--vp-c-brand); background:var(--vp-c-brand-dimm); }
+#kv-container .kv-btn { flex:1; padding:10px; border:none; border-radius:6px; cursor:pointer; font-weight:bold; }
+#kv-container .kv-btn.cancel { background:var(--vp-c-bg-mute); }
+#kv-container .kv-btn.ok { background:var(--vp-c-brand); color:white; }
+#kv-container .kv-bar { position:absolute; border-radius:2px; pointer-events:none; min-height:2px; }
 </style>
 
-<!-- 核心修正：加 setup 属性，告诉VitePress这是客户端执行脚本 -->
 <script setup>
 import { onMounted } from 'vue'
 
 onMounted(() => {
-  // 这里面的代码只会在浏览器端执行，构建阶段完全忽略
+  // 脚本里的选择器也统一用 #kv-container，和HTML/样式完全对齐
   const SAVE_KEY = 'keyview_page'
   const BAR_SPEED = 300
   const ROWS = [
@@ -87,8 +87,8 @@ onMounted(() => {
   ]
   let nextKeyId = 7, pressedKeys = new Set(), activeBars = {}, barId = 0, kpsRecords = [], firstRowBottom = 0, mainRect = null
   
-  const $ = sel => document.querySelector(`#container ${sel}`)
-  const $$ = sel => document.querySelectorAll(`#container ${sel}`)
+  const $ = sel => document.querySelector(`#kv-container ${sel}`)
+  const $$ = sel => document.querySelectorAll(`#kv-container ${sel}`)
   
   const saveConfig = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ keys, nextKeyId, ROWS })) } catch {} }
   const loadConfig = () => { try { const d = JSON.parse(localStorage.getItem(SAVE_KEY)); d && (keys = d.keys || keys, nextKeyId = d.nextKeyId || nextKeyId, ROWS.splice(0, ROWS.length, ...(d.ROWS || ROWS))) } catch {} }
@@ -130,7 +130,7 @@ onMounted(() => {
     kpsRecords.push(Date.now()); saveConfig()
   }
   
-  const handleKeyUp = code => { if(!pressedKeys.has(code))return; pressedKeys.delete(code); $$(`.key[data-code="${code}"]`).forEach(el=>el.classList.remove('pressed')) }
+  const handleKeyUp = (code) => { if(!pressedKeys.has(code))return; pressedKeys.delete(code); $$(`.key[data-code="${code}"]`).forEach(el=>el.classList.remove('pressed')) }
   
   const spawnBar = keyId => {
     const k=keys.find(x=>x.id===keyId), r=ROWS.find(r=>r.id===k.rowId), ke=$(`.key[data-id="${keyId}"]`)
@@ -146,7 +146,7 @@ onMounted(() => {
   const openModal = () => { const rb=$('#kv-rowSelectBtns'); rb.innerHTML=ROWS.map(r=>`<div class="kv-row-btns" data-rid="${r.id}">第${r.id+1}行</div>`).join(''); rb.querySelectorAll('div').forEach(b=>b.addEventListener('click',()=>{rb.querySelectorAll('div').forEach(d=>d.classList.remove('on'));b.classList.add('on')})); rb.querySelector('div').classList.add('on'); $$('.kv-type-btn').forEach(b=>b.addEventListener('click',()=>{$$('.kv-type-btn').forEach(d=>d.classList.remove('on'));b.classList.add('on')})); $('#kv-modal').classList.add('show'); $('#kv-newKeyName').focus() }
   
   $('#kv-modalOk').addEventListener('click',()=>{const l=$('#kv-newKeyName').value.trim()||'N',t=$('.kv-type-btn.on').dataset.type,rid=+$('.kv-row-btns.on').dataset.rid,co=t==='kps'?`KPS_${nextKeyId}`:t==='total'?`TOTAL_${nextKeyId}`:`Key${l.toUpperCase()}`; keys.push({id:nextKeyId++,label:l,code:co,rowId:rid,cnt:0,type:t,span:1}); saveConfig();renderKeys();renderCfg();$('#kv-modal').classList.remove('show')})
-  $('#kv-modalCancel').addEventListener('click',()=>$('#kv-modal').classList.remove('show'))
+  $('#kv-modalCancel').addEventListener('click',()=>$('#kv-modal').close?.() || $('#kv-modal').classList.remove('show'))
   
   window.addEventListener('keydown',e=>{if($('#kv-modal').classList.contains('show')){if(e.key==='Escape')$('#kv-modal').classList.remove('show');return;} const ii=['INPUT','TEXTAREA'].includes(document.activeElement.tagName);if(!ii)e.preventDefault();handleKeyDown(e.code)})
   window.addEventListener('keyup',e=>{if($('#kv-modal').classList.contains('show'))return;const ii=['INPUT','TEXTAREA'].includes(document.activeElement.tagName);if(!ii)e.preventDefault();handleKeyUp(e.code)})
