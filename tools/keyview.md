@@ -1,19 +1,19 @@
 # KeyView
 
 <div id="kv-container">
-  <!-- 主渲染区：全用Vue响应式，无手动DOM操作 -->
+  <!-- 主渲染区：放上升条，层级高于按键区 -->
   <div id="kv-main">
-    <!-- 上升条：纯CSS动画，脱离JS主线程 -->
     <div v-for="bar in bars" :key="bar.id" class="kv-bar" :style="bar.style"></div>
   </div>
 
-  <!-- 按键区 -->
+  <!-- 按键区：层级低于主渲染区，避免挡住上升条 -->
   <div id="kv-keys">
     <div v-for="rowKeys in groupedKeys" :key="rowKeys[0].rowId" class="kv-row">
       <div
         v-for="key in rowKeys"
         :key="key.id"
         class="key"
+        :data-code="key.code" <!-- 直接绑定code，不用异步Observer -->
         :class="{
           'pressed': pressedKeys.has(key.code),
           'info-key': key.type !== 'normal',
@@ -86,7 +86,7 @@
     </div>
   </div>
 
-  <!-- 弹窗：纯Vue控制，无DOM操作 -->
+  <!-- 添加按键弹窗 -->
   <div class="kv-modal-overlay" v-if="showModal">
     <div class="kv-modal-box">
       <h3>添加按键</h3>
@@ -106,7 +106,7 @@
             v-for="row in ROWS"
             :key="row.id"
             class="kv-row-btn"
-            :class="{ on: newKeyRowId === row.id }"
+            :class="{ on: newKeyType !== 'normal' ? newKeyRowId === row.id : newKeyRowId === row.id }"
             @click="newKeyRowId = row.id"
           >第{{ row.id + 1 }}行</div>
         </div>
@@ -120,7 +120,7 @@
 </div>
 
 <style>
-/* 基础重置：解决布局错位 */
+/* 基础重置 */
 #kv-container, #kv-container * {
   box-sizing: border-box;
 }
@@ -128,7 +128,6 @@
   width:100%;
   max-width: 100%;
   height:520px;
-  /* 用主题背景色，无变量时用系统UI背景兜底，不硬编码白色 */
   background: var(--vp-c-bg, Canvas);
   border:1px solid var(--vp-c-divider, #e2e8f0);
   border-radius:8px;
@@ -136,10 +135,13 @@
   overflow:hidden;
   margin:24px 0;
 }
+
+/* ===== 核心修正：层级调整，确保上升条显示在按键上方 ===== */
 #kv-container #kv-main {
   position:absolute;
   inset:0;
   bottom:200px;
+  z-index: 2; /* 高于按键区，上升条在这里渲染 */
 }
 #kv-container #kv-keys {
   position:absolute;
@@ -152,7 +154,10 @@
   gap:14px;
   padding:10px 0;
   pointer-events:none;
+  z-index: 1; /* 低于主渲染区，不遮挡上升条 */
 }
+
+/* 按键样式 */
 #kv-container .kv-row {
   display:flex;
   gap:12px;
@@ -171,14 +176,12 @@
   align-items:center;
   justify-content:center;
   font-size:15px;
-  /* 亮色用软背景，暗黑用更深的一层背景，无变量时用系统控件背景兜底 */
   background: var(--vp-c-bg-soft, var(--vp-c-bg-alt, CanvasContainer));
   color: var(--vp-c-text-1, CanvasText);
   cursor:pointer;
   transition: transform 0.05s ease, border-color 0.05s ease, background-color 0.05s ease;
   will-change: transform;
   transform: translateZ(0);
-  backface-visibility: hidden;
   pointer-events:auto;
 }
 #kv-container .key.pressed {
@@ -192,25 +195,28 @@
   min-width:110px;
   pointer-events:none;
 }
-#kv-container .kps-key .kv-val {
-  color: #ff9f43;
-  font-size:22px;
+#kv-container .kps-key .kv-val { color: #ff9f43; font-size:22px; }
+#kv-container .total-key .kv-val { color: #00b96b; font-size:22px; }
+#kv-container .kv-lbl { font-size:9px; color: var(--vp-c-text-3, #64748b); }
+#kv-container .kv-cnt { font-size:10px; color: var(--vp-c-text-3, #64748b); margin-top:2px; }
+
+/* ===== 核心修正：上升条样式，z-index最高，初始位置不贴边 ===== */
+#kv-container .kv-bar {
+  position:absolute;
+  border-radius:2px;
+  will-change: transform, opacity;
+  animation: barRise 3s linear forwards;
+  --bar-height: 52px;
+  z-index: 10; /* 主区内最高层级，不会被其他元素遮挡 */
 }
-#kv-container .total-key .kv-val {
-  color: #00b96b;
-  font-size:22px;
-}
-#kv-container .kv-lbl {
-  font-size:9px;
-  color: var(--vp-c-text-3, #64748b);
-}
-#kv-container .kv-cnt {
-  font-size:10px;
-  color: var(--vp-c-text-3, #64748b);
-  margin-top:2px;
+@keyframes barRise {
+  0% { height:2px; opacity:1; bottom: 2px; } /* 初始位置抬高2px，避免贴底边看不见 */
+  33% { height: var(--bar-height); opacity:1; }
+  66% { height: var(--bar-height); opacity:1; transform: translateY(calc(-1 * var(--bar-height))); }
+  100% { height:2px; opacity:0; transform: translateY(calc(-1 * var(--bar-height) * 2)); }
 }
 
-/* 配置区样式 */
+/* 配置区样式（已修复按钮横向排列） */
 #kv-container #kv-cfg {
   position:absolute;
   bottom:0;
@@ -254,14 +260,6 @@
   position:relative;
   flex-shrink: 0;
 }
-#kv-container .cfg-item .nm {
-  width:100%;
-  text-align: center;
-  font-size:12px;
-  color: var(--vp-c-text-1, CanvasText);
-  font-weight: bold;
-}
-/* 行选择按钮组：强制横向排列 */
 #kv-container .row-btns {
   display:flex;
   flex-direction: row !important;
@@ -269,26 +267,7 @@
   justify-content: center;
   gap:2px;
   width:100%;
-  margin-bottom:2px;
 }
-#kv-container .row-btn {
-  width:16px;
-  height:16px;
-  border-radius:2px;
-  border:1px solid var(--vp-c-divider, #e2e8f0);
-  background: var(--vp-c-bg-soft, var(--vp-c-bg-alt, CanvasContainer));
-  cursor:pointer;
-  font-size:8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-#kv-container .row-btn.on {
-  border-color: var(--vp-c-brand, #3b82f6);
-  background: var(--vp-c-brand-dimm, #dbeafe);
-}
-/* 跨度选择按钮组：强制横向排列 */
 #kv-container .span-btns {
   display:flex;
   flex-direction: row !important;
@@ -297,19 +276,20 @@
   gap:1px;
   width:100%;
 }
+#kv-container .row-btn,
 #kv-container .span-btn {
-  width:14px;
-  height:14px;
+  width:16px;
+  height:16px;
   border-radius:2px;
   border:1px solid var(--vp-c-divider, #e2e8f0);
   background: var(--vp-c-bg-soft, var(--vp-c-bg-alt, CanvasContainer));
   cursor:pointer;
-  font-size:7px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
+#kv-container .row-btn.on,
 #kv-container .span-btn.on {
   border-color: var(--vp-c-brand, #3b82f6);
   background: var(--vp-c-brand-dimm, #dbeafe);
@@ -339,7 +319,7 @@
   flex-shrink: 0;
 }
 
-/* 底部行配置样式 */
+/* 底部行配置（已修复进度条不溢出） */
 #kv-container .row-config {
   display:flex;
   flex-direction:column;
@@ -350,21 +330,11 @@
   border-radius:4px;
   flex-shrink: 0;
 }
-#kv-container .rc-label {
-  font-size:10px;
-  color: var(--vp-c-text-2, #475569);
-}
 #kv-container .rc-row {
   display:flex;
   align-items:center;
   gap:6px;
   width:100%;
-}
-#kv-container .rc-label-w {
-  font-size:9px;
-  color: var(--vp-c-text-3, #64748b);
-  width:18px;
-  flex-shrink: 0;
 }
 #kv-container input[type="range"] {
   flex:1;
@@ -377,21 +347,6 @@
   border:none;
   background:none;
   flex-shrink: 0;
-}
-
-/* 上升条动画 */
-#kv-container .kv-bar {
-  position:absolute;
-  border-radius:2px;
-  will-change: transform, opacity;
-  animation: barRise 3s linear forwards;
-  --bar-height: 52px;
-}
-@keyframes barRise {
-  0% { height:2px; opacity:1; }
-  33% { height: var(--bar-height); opacity:1; }
-  66% { height: var(--bar-height); opacity:1; transform: translateY(calc(-1 * var(--bar-height))); }
-  100% { height:2px; opacity:0; transform: translateY(calc(-1 * var(--bar-height) * 2)); }
 }
 
 /* 弹窗样式 */
@@ -453,7 +408,7 @@
   color:white;
 }
 
-/* ===== 核心修正：暗黑模式适配（VitePress默认会给html加dark类）===== */
+/* 暗黑模式适配 */
 html.dark #kv-container {
   background: var(--vp-c-bg, #1a1a1a);
   border-color: var(--vp-c-divider, #333);
@@ -466,9 +421,6 @@ html.dark #kv-container .key {
 html.dark #kv-container .key.pressed {
   background: var(--vp-c-brand-dimm, #1e3a8a);
   border-color: var(--vp-c-brand, #3b82f6);
-}
-html.dark #kv-container .info-key {
-  background: var(--vp-c-bg-mute, #1f1f1f) !important;
 }
 html.dark #kv-container #kv-cfg {
   background: var(--vp-c-bg-soft, #242424);
@@ -484,27 +436,16 @@ html.dark #kv-container .span-btn {
   border-color: var(--vp-c-divider, #333);
   color: var(--vp-c-text-1, #fff);
 }
-html.dark #kv-container .add-btn {
-  background: var(--vp-c-bg-soft, #242424);
-}
-html.dark #kv-container .row-config {
-  background: var(--vp-c-bg-mute, #1f1f1f);
-  border-color: var(--vp-c-divider, #333);
-}
 html.dark #kv-container .kv-modal-box {
   background: var(--vp-c-bg-elv, #242424);
   border-color: var(--vp-c-divider, #333);
-}
-html.dark #kv-container .kv-btn.cancel {
-  background: var(--vp-c-bg-mute, #1f1f1f);
-  color: var(--vp-c-text-1, #fff);
 }
 </style>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 
-// ===== 防抖函数（无外部依赖）=====
+// 防抖保存配置
 const debounce = (fn: Function, delay: number) => {
   let timer: number | null = null
   return (...args: any[]) => {
@@ -513,7 +454,7 @@ const debounce = (fn: Function, delay: number) => {
   }
 }
 
-// ===== 响应式数据（全Vue管理，无手动DOM操作）=====
+// 响应式数据
 const ROWS = reactive([
   { id: 0, width: 52, color: '#ff3366' },
   { id: 1, width: 40, color: '#ff9f43' },
@@ -540,7 +481,7 @@ const newKeyRowId = ref(0)
 let barId = 0
 let kpsRecords: number[] = []
 
-// ===== 计算属性（自动分组按键，无手动排序）=====
+// 按键按行分组
 const groupedKeys = computed(() => {
   const map: Record<number, typeof keys> = {}
   keys.forEach(key => {
@@ -550,7 +491,7 @@ const groupedKeys = computed(() => {
   return Object.values(map).sort((a, b) => a[0].rowId - b[0].rowId)
 })
 
-// ===== 本地存储（防抖保存，减少IO）=====
+// 保存/加载配置
 const saveConfig = debounce(() => {
   try {
     localStorage.setItem('keyview_config', JSON.stringify({
@@ -574,22 +515,24 @@ const loadConfig = () => {
   } catch {}
 }
 
-// ===== 核心逻辑 ======
+// 核心逻辑：按键按下
 const handleKeyDown = (code: string) => {
   if (pressedKeys.value.has(code)) return
   pressedKeys.value.add(code)
   
-  // 普通键计数
+  // 普通键计数+生成上升条
   keys.forEach(key => {
     if (key.code === code && key.type === 'normal') {
       key.cnt++
       total.value++
-      // 生成上升条（CSS动画，脱离JS主线程）
-      const row = ROWS[key.rowId]
+      
+      // 获取按键位置，生成上升条
       const keyEl = document.querySelector(`#kv-container .key[data-code="${code}"]`) as HTMLElement
       if (keyEl) {
         const keyRect = keyEl.getBoundingClientRect()
         const mainRect = document.querySelector('#kv-container #kv-main')!.getBoundingClientRect()
+        const row = ROWS[key.rowId]
+        
         bars.value.push({
           id: ++barId,
           style: {
@@ -597,10 +540,11 @@ const handleKeyDown = (code: string) => {
             width: `${row.width}px`,
             background: row.color,
             left: `${keyRect.left - mainRect.left + (keyRect.width - row.width) / 2}px`,
-            bottom: '0'
+            bottom: '2px' // 避免贴底边看不见
           }
         })
-        // 3秒后自动移除上升条（和CSS动画时长一致）
+        
+        // 3秒后自动移除上升条
         setTimeout(() => {
           bars.value = bars.value.filter(bar => bar.id !== barId)
         }, 3000)
@@ -616,7 +560,7 @@ const handleKeyUp = (code: string) => {
   pressedKeys.value.delete(code)
 }
 
-// ===== 配置操作（全响应式，无DOM操作）=====
+// 配置操作
 const deleteKey = (id: number) => {
   const index = keys.findIndex(key => key.id === id)
   if (index > -1) keys.splice(index, 1)
@@ -658,7 +602,7 @@ const confirmAddKey = () => {
   newKeyRowId.value = 0
 }
 
-// ===== KPS计算（requestAnimationFrame节流，不阻塞渲染）=====
+// KPS计算
 const updateKPS = () => {
   const now = Date.now()
   kpsRecords = kpsRecords.filter(t => now - t < 1000)
@@ -666,12 +610,11 @@ const updateKPS = () => {
   requestAnimationFrame(updateKPS)
 }
 
-// ===== 事件监听 ======
+// 事件监听
 onMounted(() => {
   loadConfig()
   requestAnimationFrame(updateKPS)
   
-  // 键盘事件
   window.addEventListener('keydown', (e) => {
     if (showModal.value) {
       if (e.key === 'Escape') showModal.value = false
@@ -689,26 +632,13 @@ onMounted(() => {
     handleKeyUp(e.code)
   })
   
-  // 失焦清理
   window.addEventListener('blur', () => {
     pressedKeys.value.clear()
   })
 })
 
 onUnmounted(() => {
-  // 清理事件
-})
-
-// ===== 给按键加data-code属性（方便定位）=====
-onMounted(() => {
-  const observer = new MutationObserver(() => {
-    document.querySelectorAll('#kv-container .key').forEach(keyEl => {
-      const keyId = Number(keyEl.getAttribute('data-id'))
-      const key = keys.find(k => k.id === keyId)
-      if (key) keyEl.setAttribute('data-code', key.code)
-    })
-  })
-  observer.observe(document.getElementById('kv-container')!, { childList: true, subtree: true })
+  // 清理资源
 })
 </script>
 
