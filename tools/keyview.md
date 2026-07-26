@@ -12,12 +12,7 @@
         :key="key.id"
         class="key"
         :data-code="key.code"
-        :class="{
-          'pressed': pressedKeys.has(key.code),
-          'info-key': key.type !== 'normal',
-          'kps-key': key.type === 'kps',
-          'total-key': key.type === 'total'
-        }"
+        :class="{ 'pressed': pressedKeys.has(key.code) }"
         :style="{ width: `${50 + (key.span - 1) * 56}px` }"
         @mousedown="handleKeyDown(key.code)"
         @mouseup="handleKeyUp(key.code)"
@@ -337,21 +332,25 @@ const loadConfig = () => {
 }
 
 const handleKeyDown = (code: string) => {
-  if (pressedKeys.value.has(code)) return
-  pressedKeys.value.add(code)
+  try {
+    if (pressedKeys.value.has(code)) return
+    pressedKeys.value.add(code)
 
-  keys.forEach(key => {
-    if (key.code === code && key.type === 'normal') {
-      key.cnt++
-      total.value++
+    keys.forEach(key => {
+      if (key.code === code && key.type === 'normal') {
+        key.cnt++
+        total.value++
 
-      const keyEl = document.querySelector(`#kv-container .key[data-code="${code}"]`) as HTMLElement
-      if (keyEl) {
+        // 安全获取DOM元素，避免报错打断计数
+        const keyEl = document.querySelector<HTMLElement>(`#kv-container .key[data-code="${code}"]`)
+        const mainEl = document.querySelector<HTMLElement>('#kv-container #kv-main')
+        if (!keyEl || !mainEl) return
+
         const keyRect = keyEl.getBoundingClientRect()
-        const mainRect = document.querySelector('#kv-container #kv-main')!.getBoundingClientRect()
+        const mainRect = mainEl.getBoundingClientRect()
         const row = ROWS[key.rowId]
 
-        bars.value[bars.value.length] = {
+        bars.value.push({
           id: ++barId,
           style: {
             '--bar-height': `${row.width}px`,
@@ -360,17 +359,19 @@ const handleKeyDown = (code: string) => {
             left: `${keyRect.left - mainRect.left + (keyRect.width - row.width) / 2}px`,
             bottom: '2px'
           }
-        }
+        })
 
         setTimeout(() => {
           bars.value = bars.value.filter(b => b.id !== barId)
         }, 3000)
       }
-    }
-  })
+    })
 
-  kpsRecords.push(Date.now())
-  saveConfig()
+    kpsRecords.push(Date.now())
+    saveConfig()
+  } catch (err) {
+    console.error('按键按下出错:', err)
+  }
 }
 
 const handleKeyUp = (code: string) => {
@@ -430,22 +431,25 @@ onMounted(() => {
   loadConfig()
   requestAnimationFrame(updateKPS)
 
-  window.addEventListener('keydown', e => {
+  // ✅ 核心修复：加passive: false，允许preventDefault
+  window.addEventListener('keydown', (e) => {
     if (showModal.value) {
       if (e.key === 'Escape') showModal.value = false
       return
     }
     const isInput = ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)
-    if (!isInput) e.preventDefault()
-    handleKeyDown(e.code)
-  })
+    if (!isInput) {
+      e.preventDefault()
+      handleKeyDown(e.code)
+    }
+  }, { passive: false })
 
-  window.addEventListener('keyup', e => {
+  window.addEventListener('keyup', (e) => {
     if (showModal.value) return
     const isInput = ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)
     if (!isInput) e.preventDefault()
     handleKeyUp(e.code)
-  })
+  }, { passive: false })
 
   window.addEventListener('blur', () => pressedKeys.value.clear())
 })
