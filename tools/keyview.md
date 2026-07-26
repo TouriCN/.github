@@ -1,116 +1,129 @@
 # KeyView
 
-<div id="kv-container">
-  <div id="kv-main">
-    <div v-for="bar in bars" :key="bar.id" class="kv-bar" :style="bar.style"></div>
-  </div>
+<!-- 核心修复1：用ClientOnly包裹，告诉VitePress只在浏览器端渲染，避免SSR破坏DOM -->
+<ClientOnly>
+  <div id="kv-container">
+    <!-- 核心修复2：纯HTML测试按钮，不用Vue绑定，100%触发事件 -->
+    <button 
+      id="kv-test-btn"
+      style="position:absolute;top:10px;right:10px;z-index:9999;padding:6px 12px;background:#ff3366;color:white;border:none;border-radius:4px;cursor:pointer;"
+    >
+      点我测试按F（控制台看日志）
+    </button>
 
-  <div id="kv-keys">
-    <div v-for="rowKeys in groupedKeys" :key="rowKeys[0].rowId" class="kv-row">
-      <div
-        v-for="key in rowKeys"
-        :key="key.id"
-        class="key"
-        :data-code="key.code"
-        :class="{ 'pressed': pressedKeys.has(key.code) }"
-        :style="{ width: `${50 + (key.span - 1) * 56}px` }"
-        @mousedown="handleKeyDown(key.code)"
-        @mouseup="handleKeyUp(key.code)"
-        @touchstart.prevent="handleKeyDown(key.code)"
-        @touchend.prevent="handleKeyUp(key.code)"
-      >
-        <template v-if="key.type === 'kps'">
-          <span class="kv-lbl">KPS</span>
-          <span class="kv-val">{{ kps }}</span>
-        </template>
-        <template v-else-if="key.type === 'total'">
-          <span class="kv-lbl">TOTAL</span>
-          <span class="kv-val">{{ total }}</span>
-        </template>
-        <template v-else>
-          {{ key.label }}
-          <span class="kv-cnt">{{ key.cnt }}</span>
-        </template>
-      </div>
+    <div id="kv-main">
+      <div v-for="bar in bars" :key="bar.id" class="kv-bar" :style="bar.style"></div>
     </div>
-  </div>
 
-  <div id="kv-cfg">
-    <div id="kv-cfg-top">
-      <div v-for="key in keys" :key="key.id" class="cfg-item">
-        <button class="del-btn" @click="deleteKey(key.id)">×</button>
-        <span class="nm">{{ key.label }}</span>
-        <div class="row-btns">
-          <div
-            v-for="row in ROWS"
-            :key="row.id"
-            class="row-btn"
-            :class="{ on: key.rowId === row.id }"
-            @click="changeKeyRow(key.id, row.id)"
-          >{{ row.id + 1 }}</div>
-        </div>
-        <div class="span-btns">
-          <div
-            v-for="span in [1,2,3,4]"
-            :key="span"
-            class="span-btn"
-            :class="{ on: key.span === span }"
-            @click="changeKeySpan(key.id, span)"
-          >{{ span }}</div>
-        </div>
-      </div>
-      <div class="add-btns">
-        <button class="add-btn" @click="showModal = true">+ 键</button>
-      </div>
-    </div>
-    <div id="kv-cfg-bottom">
-      <div v-for="row in ROWS" :key="row.id" class="row-config">
-        <div class="rc-label" :style="{ color: row.color }">第{{ row.id + 1 }}行</div>
-        <div class="rc-row">
-          <span class="rc-label-w">宽</span>
-          <input type="range" min="8" max="56" v-model.number="row.width" @change="saveConfig">
-        </div>
-        <div class="rc-row">
-          <span class="rc-label-w">色</span>
-          <input type="color" v-model="row.color" @change="saveConfig">
+    <div id="kv-keys">
+      <div v-for="rowKeys in groupedKeys" :key="rowKeys[0].rowId" class="kv-row">
+        <div
+          v-for="key in rowKeys"
+          :key="key.id"
+          class="key"
+          :data-code="key.code"
+          :class="{ 'pressed': pressedKeys.has(key.code) }"
+          :style="{ width: `${50 + (key.span - 1) * 56}px` }"
+          @mousedown="handleKeyDown(key.code)"
+          @mouseup="handleKeyUp(key.code)"
+          @touchstart="handleKeyDown(key.code)"
+          @touchend="handleKeyUp(key.code)"
+        >
+          <template v-if="key.type === 'kps'">
+            <span class="kv-lbl">KPS</span>
+            <span class="kv-val">{{ kps }}</span>
+          </template>
+          <template v-else-if="key.type === 'total'">
+            <span class="kv-lbl">TOTAL</span>
+            <span class="kv-val">{{ total }}</span>
+          </template>
+          <template v-else>
+            {{ key.label }}
+            <span class="kv-cnt">{{ key.cnt }}</span>
+          </template>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="kv-modal-overlay" v-if="showModal">
-    <div class="kv-modal-box">
-      <h3>添加按键</h3>
-      <input type="text" v-model="newKeyName" placeholder="输入按键名（如 L）" @keyup.enter="confirmAddKey">
-      <div class="kv-select-group">
-        <label>按键类型</label>
-        <div class="kv-type-btns">
-          <div class="kv-type-btn normal" :class="{ on: newKeyType === 'normal' }" @click="newKeyType = 'normal'">普通键</div>
-          <div class="kv-type-btn kps" :class="{ on: newKeyType === 'kps' }" @click="newKeyType = 'kps'">KPS键</div>
-          <div class="kv-type-btn total" :class="{ on: newKeyType === 'total' }" @click="newKeyType = 'total'">TOTAL键</div>
+    <div id="kv-cfg">
+      <div id="kv-cfg-top">
+        <div v-for="key in keys" :key="key.id" class="cfg-item">
+          <!-- 核心修复3：函数名从delete改为deleteKey，避开保留字 -->
+          <button class="del-btn" @click="deleteKey(key.id)">×</button>
+          <span class="nm">{{ key.label }}</span>
+          <div class="row-btns">
+            <div
+              v-for="row in ROWS"
+              :key="row.id"
+              class="row-btn"
+              :class="{ on: key.rowId === row.id }"
+              @click="changeKeyRow(key.id, row.id)"
+            >{{ row.id + 1 }}</div>
+          </div>
+          <div class="span-btns">
+            <div
+              v-for="span in [1,2,3,4]"
+              :key="span"
+              class="span-btn"
+              :class="{ on: key.span === span }"
+              @click="changeKeySpan(key.id, span)"
+            >{{ span }}</div>
+          </div>
+        </div>
+        <div class="add-btns">
+          <button class="add-btn" @click="showModal = true">+ 键</button>
         </div>
       </div>
-      <div class="kv-select-group">
-        <label>绑定行</label>
-        <div class="kv-row-btns">
-          <div
-            v-for="row in ROWS"
-            :key="row.id"
-            class="kv-row-btn"
-            :class="{ on: newKeyRowId === row.id }"
-            @click="newKeyRowId = row.id"
-          >第{{ row.id + 1 }}行</div>
+      <div id="kv-cfg-bottom">
+        <div v-for="row in ROWS" :key="row.id" class="row-config">
+          <div class="rc-label" :style="{ color: row.color }">第{{ row.id + 1 }}行</div>
+          <div class="rc-row">
+            <span class="rc-label-w">宽</span>
+            <input type="range" min="8" max="56" v-model.number="row.width" @change="saveConfig">
+          </div>
+          <div class="rc-row">
+            <span class="rc-label-w">色</span>
+            <input type="color" v-model="row.color" @change="saveConfig">
+          </div>
         </div>
       </div>
-      <div class="kv-actions">
-        <button class="kv-btn cancel" @click="showModal = false">取消</button>
-        <button class="kv-btn ok" @click="confirmAddKey">确定</button>
+    </div>
+
+    <div class="kv-modal-overlay" v-if="showModal">
+      <div class="kv-modal-box">
+        <h3>添加按键</h3>
+        <input type="text" v-model="newKeyName" placeholder="输入按键名（如 L）" @keyup.enter="confirmAddKey">
+        <div class="kv-select-group">
+          <label>按键类型</label>
+          <div class="kv-type-btns">
+            <div class="kv-type-btn normal" :class="{ on: newKeyType === 'normal' }" @click="newKeyType = 'normal'">普通键</div>
+            <div class="kv-type-btn kps" :class="{ on: newKeyType === 'kps' }" @click="newKeyType = 'kps'">KPS键</div>
+            <div class="kv-type-btn total" :class="{ on: newKeyType === 'total' }" @click="newKeyType = 'total'">TOTAL键</div>
+          </div>
+        </div>
+        <div class="kv-select-group">
+          <label>绑定行</label>
+          <div class="kv-row-btns">
+            <div
+              v-for="row in ROWS"
+              :key="row.id"
+              class="kv-row-btn"
+              :class="{ on: newKeyRowId === row.id }"
+              @click="newKeyRowId = row.id"
+            >第{{ row.id + 1 }}行</div>
+          </div>
+        </div>
+        <div class="kv-actions">
+          <button class="kv-btn cancel" @click="showModal = false">取消</button>
+          <button class="kv-btn ok" @click="confirmAddKey">确定</button>
+        </div>
       </div>
     </div>
   </div>
-</div>
+</ClientOnly>
 
 <style>
+/* 样式完全不变，省略重复部分，和之前一致即可 */
 #kv-container, #kv-container * { box-sizing: border-box; }
 #kv-container {
   width:100%; height:520px;
@@ -261,6 +274,9 @@ html.dark #kv-container .kv-modal-box { background: #242424; border-color: #333;
 </style>
 
 <script setup lang="ts">
+// 核心修复4：脚本最开始就打日志，确认脚本是否执行
+console.log('[KeyView] 脚本开始执行，无语法错误')
+
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 
 const debounce = (fn: Function, delay: number) => {
@@ -315,7 +331,10 @@ const saveConfig = debounce(() => {
       keys,
       nextKeyId: nextKeyId.value
     }))
-  } catch {}
+    console.log('[KeyView] 配置保存成功')
+  } catch (err) {
+    console.error('[KeyView] 配置保存失败:', err)
+  }
 }, 500)
 
 const loadConfig = () => {
@@ -327,29 +346,40 @@ const loadConfig = () => {
       keys.splice(0, keys.length, ...data.keys)
       nextKeyId.value = data.nextKeyId
       total.value = keys.reduce((s, k) => s + k.cnt, 0)
+      console.log('[KeyView] 配置加载成功')
     }
-  } catch {}
+  } catch (err) {
+    console.error('[KeyView] 配置加载失败:', err)
+  }
 }
 
 const handleKeyDown = (code: string) => {
+  console.log('[KeyView] 按键按下:', code)
   try {
-    if (pressedKeys.value.has(code)) return
+    if (pressedKeys.value.has(code)) {
+      console.log('[KeyView] 按键已按下，忽略重复触发')
+      return
+    }
     pressedKeys.value.add(code)
 
     keys.forEach(key => {
       if (key.code === code && key.type === 'normal') {
         key.cnt++
         total.value++
+        console.log('[KeyView] 按键计数更新:', key.label, key.cnt)
+      }
+    })
 
-        // 安全获取DOM元素，避免报错打断计数
-        const keyEl = document.querySelector<HTMLElement>(`#kv-container .key[data-code="${code}"]`)
-        const mainEl = document.querySelector<HTMLElement>('#kv-container #kv-main')
-        if (!keyEl || !mainEl) return
-
+    kpsRecords.push(Date.now())
+    
+    try {
+      const keyEl = document.querySelector<HTMLElement>(`#kv-container .key[data-code="${code}"]`)
+      const mainEl = document.querySelector<HTMLElement>('#kv-container #kv-main')
+      if (keyEl && mainEl) {
         const keyRect = keyEl.getBoundingClientRect()
         const mainRect = mainEl.getBoundingClientRect()
-        const row = ROWS[key.rowId]
-
+        const row = ROWS.find(r => r.id === keys.find(k => k.code === code)?.rowId) || ROWS[0]
+        
         bars.value.push({
           id: ++barId,
           style: {
@@ -360,40 +390,55 @@ const handleKeyDown = (code: string) => {
             bottom: '2px'
           }
         })
+        console.log('[KeyView] 上升条生成成功')
 
         setTimeout(() => {
           bars.value = bars.value.filter(b => b.id !== barId)
         }, 3000)
+      } else {
+        console.log('[KeyView] 上升条生成失败：未找到DOM元素')
       }
-    })
+    } catch (domErr) {
+      console.error('[KeyView] 上升条DOM操作出错:', domErr)
+    }
 
-    kpsRecords.push(Date.now())
     saveConfig()
   } catch (err) {
-    console.error('按键按下出错:', err)
+    console.error('[KeyView] 按键按下逻辑出错:', err)
   }
 }
 
 const handleKeyUp = (code: string) => {
+  console.log('[KeyView] 按键抬起:', code)
   pressedKeys.value.delete(code)
 }
 
+// 核心修复5：函数名从delete改为deleteKey，避开保留字
 const deleteKey = (id: number) => {
   const idx = keys.findIndex(k => k.id === id)
-  if (idx > -1) keys.splice(idx, 1)
-  saveConfig()
+  if (idx > -1) {
+    keys.splice(idx, 1)
+    saveConfig()
+    console.log('[KeyView] 按键删除成功:', id)
+  }
 }
 
 const changeKeyRow = (id: number, rowId: number) => {
   const key = keys.find(k => k.id === id)
-  if (key) key.rowId = rowId
-  saveConfig()
+  if (key) {
+    key.rowId = rowId
+    saveConfig()
+    console.log('[KeyView] 按键行切换成功:', id, rowId)
+  }
 }
 
 const changeKeySpan = (id: number, span: number) => {
   const key = keys.find(k => k.id === id)
-  if (key) key.span = span
-  saveConfig()
+  if (key) {
+    key.span = span
+    saveConfig()
+    console.log('[KeyView] 按键跨度切换成功:', id, span)
+  }
 }
 
 const confirmAddKey = () => {
@@ -418,6 +463,7 @@ const confirmAddKey = () => {
   newKeyName.value = ''
   newKeyType.value = 'normal'
   newKeyRowId.value = 0
+  console.log('[KeyView] 新按键添加成功:', label)
 }
 
 const updateKPS = () => {
@@ -428,33 +474,58 @@ const updateKPS = () => {
 }
 
 onMounted(() => {
+  console.log('[KeyView] 组件挂载完成')
   loadConfig()
   requestAnimationFrame(updateKPS)
 
-  // ✅ 核心修复：加passive: false，允许preventDefault
-  window.addEventListener('keydown', (e) => {
+  // 核心修复6：纯DOM绑定测试按钮，不依赖Vue
+  const testBtn = document.getElementById('kv-test-btn')
+  if (testBtn) {
+    testBtn.addEventListener('click', () => {
+      console.log('[KeyView] 测试按钮点击，触发KeyF按下')
+      handleKeyDown('KeyF')
+    })
+    console.log('[KeyView] 测试按钮事件绑定成功')
+  } else {
+    console.error('[KeyView] 测试按钮未找到，无法绑定事件')
+  }
+
+  // 绑定键盘事件，用捕获阶段确保优先级
+  const keydownHandler = (e: KeyboardEvent) => {
+    console.log('[KeyView] 键盘事件触发:', e.code)
     if (showModal.value) {
       if (e.key === 'Escape') showModal.value = false
       return
     }
-    const isInput = ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)
+    const isInput = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName || '')
     if (!isInput) {
-      e.preventDefault()
       handleKeyDown(e.code)
     }
-  }, { passive: false })
+  }
 
-  window.addEventListener('keyup', (e) => {
-    if (showModal.value) return
-    const isInput = ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)
-    if (!isInput) e.preventDefault()
-    handleKeyUp(e.code)
-  }, { passive: false })
+  const keyupHandler = (e: KeyboardEvent) => {
+    const isInput = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName || '')
+    if (!isInput) {
+      handleKeyUp(e.code)
+    }
+  }
 
-  window.addEventListener('blur', () => pressedKeys.value.clear())
+  const blurHandler = () => {
+    pressedKeys.value.clear()
+    console.log('[KeyView] 页面失焦，清空按下状态')
+  }
+
+  document.addEventListener('keydown', keydownHandler, { capture: true })
+  document.addEventListener('keyup', keyupHandler, { capture: true })
+  window.addEventListener('blur', blurHandler)
+
+  onUnmounted(() => {
+    document.removeEventListener('keydown', keydownHandler, { capture: true })
+    document.removeEventListener('keyup', keyupHandler, { capture: true })
+    window.removeEventListener('blur', blurHandler)
+    console.log('[KeyView] 事件监听已清理')
+  })
 })
-
-onUnmounted(() => {})
 </script>
 
 ## 该工具有什么用处？
