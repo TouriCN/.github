@@ -163,7 +163,7 @@
 import { onUnmounted } from 'vue'
 
 // ✅ 构建阶段直接短路，彻底规避SSR编译报错
-if (typeof window === 'undefined') return
+if (typeof window === 'undefined') {
 
 /* ========== 配置 ========== */
 const SAVE_KEY = 'keyview_fghj'
@@ -487,6 +487,8 @@ onUnmounted(() => {
   clearInterval(kpsTimer)
   if (rafId) cancelAnimationFrame(rafId)
 })
+
+}
 </script>
 
 # 该工具有什么用处？
