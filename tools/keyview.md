@@ -120,48 +120,339 @@
 </div>
 
 <style>
-/* 所有动画开启GPU加速，流畅度拉满 */
-#kv-container { width:100%; height:520px; background:var(--vp-c-bg); border:1px solid var(--vp-c-divider); border-radius:8px; position:relative; overflow:hidden; margin:24px 0; }
-#kv-container #kv-main { position:absolute; inset:0; bottom:200px; }
-#kv-container #kv-keys { position:absolute; left:0; right:0; bottom:200px; display:flex; flex-direction:column; align-items:center; gap:14px; padding:10px 0; pointer-events:none; }
-#kv-container .kv-row { display:flex; gap:12px; pointer-events:auto; }
-#kv-container .key { min-width:50px; height:50px; border:2px solid var(--vp-c-divider); border-radius:8px; font-weight:bold; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:15px; background:var(--vp-c-bg-soft); color:var(--vp-c-text-1); cursor:pointer; transition: transform 0.05s ease, border-color 0.05s ease; will-change: transform; pointer-events:auto; }
-#kv-container .key.pressed { transform: scale(0.96); border-color: var(--vp-c-brand); background: var(--vp-c-brand-dimm); }
-#kv-container .info-key { background:var(--vp-c-bg-mute) !important; cursor:default; min-width:110px; pointer-events:none; }
-#kv-container .kps-key .kv-val { color:#ff9f43; font-size:22px; }
-#kv-container .total-key .kv-val { color:#00b96b; font-size:22px; }
-#kv-container .kv-lbl { font-size:9px; color:var(--vp-c-text-3); }
-#kv-container .kv-cnt { font-size:10px; color:var(--vp-c-text-3); margin-top:2px; }
-#kv-container #kv-cfg { position:absolute; bottom:0; left:0; right:0; height:200px; background:var(--vp-c-bg-soft); border-top:1px solid var(--vp-c-divider); display:flex; flex-direction:column; }
-#kv-container #kv-cfg-top { flex:1; display:flex; gap:12px; padding:10px; overflow:auto; }
-#kv-container #kv-cfg-bottom { height:80px; display:flex; gap:16px; padding:0 12px; align-items:center; overflow:auto; }
-#kv-container .cfg-item { min-width:72px; padding:6px; border:1px solid var(--vp-c-divider); border-radius:6px; background:var(--vp-c-bg-mute); display:flex; flex-direction:column; align-items:center; gap:3px; position:relative; }
-#kv-container .del-btn { position:absolute; top:-5px; right:-5px; width:15px; height:15px; border-radius:50%; background:var(--vp-c-danger); color:white; border:none; cursor:pointer; font-size:10px; }
-#kv-container .row-btn { width:16px; height:16px; border-radius:2px; border:1px solid var(--vp-c-divider); background:var(--vp-c-bg-soft); cursor:pointer; font-size:8px; }
-#kv-container .row-btn.on { border-color:var(--vp-c-brand); background:var(--vp-c-brand-dimm); }
-#kv-container .span-btn { width:14px; height:14px; border-radius:2px; border:1px solid var(--vp-c-divider); background:var(--vp-c-bg-soft); cursor:pointer; font-size:7px; }
-#kv-container .span-btn.on { border-color:var(--vp-c-brand); background:var(--vp-c-brand-dimm); }
-#kv-container .add-btn { padding:8px 14px; border:2px solid var(--vp-c-brand); background:var(--vp-c-bg-soft); color:var(--vp-c-brand); border-radius:6px; cursor:pointer; }
-#kv-container .row-config { display:flex; flex-direction:column; gap:3px; min-width:90px; padding:4px 6px; border:1px solid var(--vp-c-divider); border-radius:4px; }
-#kv-container .rc-label { font-size:10px; color:var(--vp-c-text-2); }
-#kv-container .rc-row { display:flex; align-items:center; gap:6px; }
-#kv-container .rc-label-w { font-size:9px; color:var(--vp-c-text-3); width:18px; }
-#kv-container .kv-bar { position:absolute; border-radius:2px; will-change: transform, opacity; animation: barRise 3s linear forwards; }
+/* 基础重置：解决布局错位 */
+#kv-container, #kv-container * {
+  box-sizing: border-box;
+}
+#kv-container {
+  width:100%;
+  max-width: 100%;
+  height:520px;
+  background: var(--vp-c-bg, #ffffff);
+  border:1px solid var(--vp-c-divider, #e2e8f0);
+  border-radius:8px;
+  position:relative;
+  overflow:hidden;
+  margin:24px 0;
+}
+#kv-container #kv-main {
+  position:absolute;
+  inset:0;
+  bottom:200px;
+}
+#kv-container #kv-keys {
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:200px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:14px;
+  padding:10px 0;
+  pointer-events:none;
+}
+#kv-container .kv-row {
+  display:flex;
+  gap:12px;
+  pointer-events:auto;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+#kv-container .key {
+  min-width:50px;
+  height:50px;
+  border:2px solid var(--vp-c-divider, #e2e8f0);
+  border-radius:8px;
+  font-weight:bold;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  font-size:15px;
+  background: var(--vp-c-bg-soft, #f6f6f7);
+  color: var(--vp-c-text-1, #1a202c);
+  cursor:pointer;
+  transition: transform 0.05s ease, border-color 0.05s ease, background-color 0.05s ease;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  pointer-events:auto;
+}
+#kv-container .key.pressed {
+  transform: scale(0.96);
+  border-color: var(--vp-c-brand, #3b82f6);
+  background: var(--vp-c-brand-dimm, #dbeafe);
+}
+#kv-container .info-key {
+  background: var(--vp-c-bg-mute, #edf2f7) !important;
+  cursor:default;
+  min-width:110px;
+  pointer-events:none;
+}
+#kv-container .kps-key .kv-val {
+  color: #ff9f43;
+  font-size:22px;
+}
+#kv-container .total-key .kv-val {
+  color: #00b96b;
+  font-size:22px;
+}
+#kv-container .kv-lbl {
+  font-size:9px;
+  color: var(--vp-c-text-3, #64748b);
+}
+#kv-container .kv-cnt {
+  font-size:10px;
+  color: var(--vp-c-text-3, #64748b);
+  margin-top:2px;
+}
+
+/* ===== 修复1：配置项内按钮强制横向排列 ===== */
+#kv-container #kv-cfg {
+  position:absolute;
+  bottom:0;
+  left:0;
+  right:0;
+  height:200px;
+  background: var(--vp-c-bg-soft, #f6f6f7);
+  border-top:1px solid var(--vp-c-divider, #e2e8f0);
+  display:flex;
+  flex-direction:column;
+}
+#kv-container #kv-cfg-top {
+  flex:1;
+  display:flex;
+  gap:12px;
+  padding:10px;
+  overflow:auto;
+  flex-wrap: wrap;
+  align-content: flex-start;
+}
+#kv-container #kv-cfg-bottom {
+  height:80px;
+  display:flex;
+  gap:16px;
+  padding:0 12px;
+  padding-right: 12px; /* 避免右侧溢出 */
+  align-items:center;
+  overflow:auto;
+  flex-wrap: wrap;
+}
+#kv-container .cfg-item {
+  min-width:72px;
+  max-width:90px;
+  padding:6px;
+  border:1px solid var(--vp-c-divider, #e2e8f0);
+  border-radius:6px;
+  background: var(--vp-c-bg-mute, #edf2f7);
+  display:flex;
+  flex-direction:column;
+  align-items:center; /* 内部元素居中 */
+  gap:4px;
+  position:relative;
+  flex-shrink: 0;
+}
+#kv-container .cfg-item .nm {
+  width:100%;
+  text-align: center;
+  font-size:12px;
+  color: var(--vp-c-text-1, #1a202c);
+  font-weight: bold;
+}
+/* 行选择按钮组：强制横向排列 */
+#kv-container .row-btns {
+  display:flex;
+  flex-direction: row !important; /* 强制横向，解决竖排问题 */
+  flex-wrap: wrap;
+  justify-content: center;
+  gap:2px;
+  width:100%; /* 占满配置项宽度 */
+  margin-bottom:2px;
+}
+#kv-container .row-btn {
+  width:16px;
+  height:16px;
+  border-radius:2px;
+  border:1px solid var(--vp-c-divider, #e2e8f0);
+  background: var(--vp-c-bg-soft, #f6f6f7);
+  cursor:pointer;
+  font-size:8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+#kv-container .row-btn.on {
+  border-color: var(--vp-c-brand, #3b82f6);
+  background: var(--vp-c-brand-dimm, #dbeafe);
+}
+/* 跨度选择按钮组：强制横向排列 */
+#kv-container .span-btns {
+  display:flex;
+  flex-direction: row !important; /* 强制横向，解决竖排问题 */
+  flex-wrap: wrap;
+  justify-content: center;
+  gap:1px;
+  width:100%; /* 占满配置项宽度 */
+}
+#kv-container .span-btn {
+  width:14px;
+  height:14px;
+  border-radius:2px;
+  border:1px solid var(--vp-c-divider, #e2e8f0);
+  background: var(--vp-c-bg-soft, #f6f6f7);
+  cursor:pointer;
+  font-size:7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+#kv-container .span-btn.on {
+  border-color: var(--vp-c-brand, #3b82f6);
+  background: var(--vp-c-brand-dimm, #dbeafe);
+}
+#kv-container .del-btn {
+  position:absolute;
+  top:-5px;
+  right:-5px;
+  width:15px;
+  height:15px;
+  border-radius:50%;
+  background: var(--vp-c-danger, #ef4444);
+  color:white;
+  border:none;
+  cursor:pointer;
+  font-size:10px;
+  line-height: 15px;
+  text-align: center;
+}
+#kv-container .add-btn {
+  padding:8px 14px;
+  border:2px solid var(--vp-c-brand, #3b82f6);
+  background: var(--vp-c-bg-soft, #f6f6f7);
+  color: var(--vp-c-brand, #3b82f6);
+  border-radius:6px;
+  cursor:pointer;
+  flex-shrink: 0;
+}
+
+/* ===== 修复2：底部进度条限制宽度，不溢出 ===== */
+#kv-container .row-config {
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  min-width:90px;
+  padding:4px 6px;
+  border:1px solid var(--vp-c-divider, #e2e8f0);
+  border-radius:4px;
+  flex-shrink: 0;
+}
+#kv-container .rc-label {
+  font-size:10px;
+  color: var(--vp-c-text-2, #475569);
+}
+#kv-container .rc-row {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  width:100%; /* 占满行配置宽度 */
+}
+#kv-container .rc-label-w {
+  font-size:9px;
+  color: var(--vp-c-text-3, #64748b);
+  width:18px;
+  flex-shrink: 0;
+}
+/* 进度条自适应宽度，不溢出 */
+#kv-container input[type="range"] {
+  flex:1; /* 占满剩余宽度 */
+  max-width: 60px; /* 最大宽度限制 */
+  height:12px;
+}
+/* 颜色选择器限制大小 */
+#kv-container input[type="color"] {
+  width:24px;
+  height:24px;
+  border:none;
+  background:none;
+  flex-shrink: 0;
+}
+
+/* 上升条动画 */
+#kv-container .kv-bar {
+  position:absolute;
+  border-radius:2px;
+  will-change: transform, opacity;
+  animation: barRise 3s linear forwards;
+  --bar-height: 52px;
+}
 @keyframes barRise {
   0% { height:2px; opacity:1; }
   33% { height: var(--bar-height); opacity:1; }
   66% { height: var(--bar-height); opacity:1; transform: translateY(calc(-1 * var(--bar-height))); }
   100% { height:2px; opacity:0; transform: translateY(calc(-1 * var(--bar-height) * 2)); }
 }
-#kv-container .kv-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99999; display:flex; align-items:center; justify-content:center; }
-#kv-container .kv-modal-box { background:var(--vp-c-bg-elv); border:1px solid var(--vp-c-divider); border-radius:12px; padding:20px; width:320px; }
-#kv-container .kv-type-btn { flex:1; padding:8px; border:2px solid var(--vp-c-divider); border-radius:4px; cursor:pointer; font-size:11px; text-align:center; }
-#kv-container .kv-type-btn.on { border-color:var(--vp-c-brand); background:var(--vp-c-brand-dimm); }
-#kv-container .kv-row-btn { padding:6px 10px; border-radius:4px; border:2px solid var(--vp-c-divider); cursor:pointer; font-size:11px; }
-#kv-container .kv-row-btn.on { border-color:var(--vp-c-brand); background:var(--vp-c-brand-dimm); }
-#kv-container .kv-btn { flex:1; padding:10px; border:none; border-radius:6px; cursor:pointer; font-weight:bold; }
-#kv-container .kv-btn.cancel { background:var(--vp-c-bg-mute); }
-#kv-container .kv-btn.ok { background:var(--vp-c-brand); color:white; }
+
+/* 弹窗样式 */
+#kv-container .kv-modal-overlay {
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.6);
+  z-index:99999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+#kv-container .kv-modal-box {
+  background: var(--vp-c-bg-elv, #ffffff);
+  border:1px solid var(--vp-c-divider, #e2e8f0);
+  border-radius:12px;
+  padding:20px;
+  width:320px;
+  max-width: 90vw;
+}
+#kv-container .kv-type-btn {
+  flex:1;
+  padding:8px;
+  border:2px solid var(--vp-c-divider, #e2e8f0);
+  border-radius:4px;
+  cursor:pointer;
+  font-size:11px;
+  text-align:center;
+}
+#kv-container .kv-type-btn.on {
+  border-color: var(--vp-c-brand, #3b82f6);
+  background: var(--vp-c-brand-dimm, #dbeafe);
+}
+#kv-container .kv-row-btn {
+  padding:6px 10px;
+  border-radius:4px;
+  border:2px solid var(--vp-c-divider, #e2e8f0);
+  cursor:pointer;
+  font-size:11px;
+}
+#kv-container .kv-row-btn.on {
+  border-color: var(--vp-c-brand, #3b82f6);
+  background: var(--vp-c-brand-dimm, #dbeafe);
+}
+#kv-container .kv-btn {
+  flex:1;
+  padding:10px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-weight:bold;
+}
+#kv-container .kv-btn.cancel {
+  background: var(--vp-c-bg-mute, #edf2f7);
+  color: var(--vp-c-text-1, #1a202c);
+}
+#kv-container .kv-btn.ok {
+  background: var(--vp-c-brand, #3b82f6);
+  color:white;
+}
 </style>
 
 <script setup lang="ts">
