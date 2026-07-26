@@ -5,7 +5,7 @@
   <!-- 主区域 -->
   <div id="kv-main"></div>
 
-  <!-- 按键区域：Vue响应式渲染，不再用JS动态innerHTML -->
+  <!-- 按键区域 -->
   <div id="kv-keys">
     <div v-for="rowKeys in groupedKeys" :key="rowKeys[0]?.rowId" class="kv-row">
       <div
@@ -44,7 +44,7 @@
     </div>
   </div>
 
-  <!-- 配置区域：响应式渲染 -->
+  <!-- 配置区域 -->
   <div id="kv-cfg">
     <div id="kv-cfg-top">
       <div v-for="key in keys" :key="key.id" class="cfg-item">
@@ -104,7 +104,7 @@
     </div>
   </div>
 
-  <!-- 弹窗：用v-if控制，不用class切换 -->
+  <!-- 弹窗 -->
   <div class="kv-modal-overlay" v-if="modalVisible">
     <div class="kv-modal-box">
       <h3>添加按键</h3>
@@ -166,7 +166,7 @@
 </ClientOnly>
 
 <style>
-/* 你之前的CSS完全不用改，直接粘贴在这里即可 */
+/* 样式完全不用改，和你之前的一致即可 */
 #kv-container {
   position: relative;
   width: 100%;
@@ -286,15 +286,15 @@
 </style>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 
-// ===== 纯常量，构建安全 =====
+// ===== 纯常量 =====
 const SAVE_KEY = 'keyview_fghj'
 const BAR_SPEED = 300
 const BAR_FADE_DELAY = 1000
 const BAR_FADE_DUR = 2000
 
-// ===== 响应式数据（核心：所有DOM渲染依赖这些，不用原生innerHTML）=====
+// ===== 响应式数据 =====
 const ROWS = ref([
   { id: 0, width: 52, color: '#ff3366' },
   { id: 1, width: 40, color: '#ff9f43' },
@@ -311,7 +311,7 @@ const newKeyName = ref('')
 const newKeyType = ref('normal')
 const newKeyRowId = ref(0)
 
-// ===== 计算属性：按键按行分组 =====
+// ===== 计算属性 =====
 const groupedKeys = computed(() => {
   const map = {}
   keys.value.forEach(key => {
@@ -348,13 +348,12 @@ const loadConfig = () => {
       ROWS.value = d.ROWS || ROWS.value
       keys.value = d.keys || keys.value
       nextKeyId.value = d.nextKeyId || nextKeyId.value
-      // 同步total
       total.value = keys.value.reduce((sum, k) => sum + (k.cnt || 0), 0)
     }
   } catch {}
 }
 
-// ===== 动画逻辑（唯一保留的原生DOM操作，因为是动态生成的临时元素）=====
+// ===== 动画逻辑（补了缺失的keyId属性）=====
 const tick = (now) => {
   let has = false
   for (const id in activeBars) {
@@ -410,8 +409,10 @@ const spawnBar = (keyId) => {
   `
   document.querySelector('#kv-container #kv-main').appendChild(bar)
 
+  // ✅ 补了keyId属性，之前漏了导致triggerUp匹配不到
   activeBars[++barId] = {
     el: bar,
+    keyId: keyId, // 关键修复！
     state: 'growing',
     lastTime: performance.now(),
     height: 2,
@@ -444,6 +445,7 @@ const triggerUp = (code) => {
 
   keys.value.filter(k => k.code === code).forEach(key => {
     for (const id in activeBars) {
+      // 现在能正确匹配到keyId了
       if (activeBars[id].keyId === key.id && activeBars[id].state === 'growing') {
         activeBars[id].state = 'rising'
         activeBars[id].riseT = 0
@@ -506,12 +508,13 @@ const confirmAddKey = () => {
   modalVisible.value = false
 }
 
-// ===== 初始化 =====
-onMounted(() => {
+// ===== 核心修复：用nextTick等待<ClientOnly>内容渲染完成 =====
+onMounted(async () => {
+  // ✅ 等<ClientOnly>里的内容完全插入DOM后再执行初始化
+  await nextTick()
+
   // 加载本地配置
   loadConfig()
-
-  // 初始化按键：如果本地没有则加载默认
   if (keys.value.length === 0) {
     keys.value = [
       { id: 1, label: 'F', code: 'KeyF', rowId: 0, cnt: 0, type: 'normal', span: 1 },
@@ -525,7 +528,7 @@ onMounted(() => {
     saveConfig()
   }
 
-  // 计算按键位置
+  // 计算按键位置（此时DOM已存在）
   const calcBottom = () => {
     const main = document.querySelector('#kv-container #kv-main')
     if (!main) return
@@ -544,8 +547,11 @@ onMounted(() => {
     if (firstRowBottom < 20) firstRowBottom = 20
     if (firstRowBottom > mainRect.height - 10) firstRowBottom = mainRect.height - 10
   }
-  requestAnimationFrame(() => requestAnimationFrame(calcBottom))
-  window.addEventListener('resize', () => requestAnimationFrame(calcBottom))
+
+  // 等DOM更新后再计算位置
+  await nextTick()
+  calcBottom()
+  window.addEventListener('resize', calcBottom)
 
   // KPS更新定时器
   kpsTimer = setInterval(() => {
