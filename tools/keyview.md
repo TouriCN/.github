@@ -1,5 +1,6 @@
 # KeyView
 
+<ClientOnly>
 <div id="kv-container">
   <div id="kv-main"></div>
   <div id="kv-keys"></div>
@@ -30,6 +31,7 @@
     </div>
   </div>
 </div>
+</ClientOnly>
 
 <style>
 /* 全部使用 VitePress 官方主题变量，自动适配亮/暗色模式 */
