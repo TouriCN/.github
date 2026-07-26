@@ -1,609 +1,131 @@
 # KeyView
 
-<ClientOnly>
 <div id="kv-container">
-  <!-- 主区域 -->
   <div id="kv-main"></div>
-
-  <!-- 按键区域 -->
-  <div id="kv-keys">
-    <div v-for="rowKeys in groupedKeys" :key="rowKeys[0]?.rowId" class="kv-row">
-      <div
-        v-for="key in rowKeys"
-        :key="key.id"
-        class="key"
-        :class="{
-          'info-key': key.type !== 'normal',
-          'kps-key': key.type === 'kps',
-          'total-key': key.type === 'total',
-          'pressed': pressedKeys.has(key.code)
-        }"
-        :data-code="key.code"
-        :data-id="key.id"
-        :style="{ width: `${50 + (key.span - 1) * 56}px` }"
-        @mousedown="triggerDown(key.code)"
-        @touchstart.prevent="triggerDown(key.code)"
-        @mouseup="triggerUp(key.code)"
-        @touchend="triggerUp(key.code)"
-        @touchcancel="triggerUp(key.code)"
-        @mouseleave="triggerUp(key.code)"
-      >
-        <template v-if="key.type === 'kps'">
-          <span class="kv-lbl">KPS</span>
-          <span class="kv-val">{{ kps }}</span>
-        </template>
-        <template v-else-if="key.type === 'total'">
-          <span class="kv-lbl">TOTAL</span>
-          <span class="kv-val">{{ total }}</span>
-        </template>
-        <template v-else>
-          {{ key.label }}
-          <span class="kv-cnt">{{ key.cnt }}</span>
-        </template>
-      </div>
-    </div>
-  </div>
-
-  <!-- 配置区域 -->
+  <div id="kv-keys"></div>
   <div id="kv-cfg">
-    <div id="kv-cfg-top">
-      <div v-for="key in keys" :key="key.id" class="cfg-item">
-        <button class="del-btn" @click="deleteKey(key.id)">×</button>
-        <span class="nm">{{ key.label }}</span>
-        <div class="row-btns">
-          <div
-            v-for="row in ROWS"
-            :key="row.id"
-            class="row-btn"
-            :class="{ on: key.rowId === row.id }"
-            @click="changeKeyRow(key.id, row.id)"
-          >
-            {{ row.id + 1 }}
-          </div>
-        </div>
-        <div class="span-btns">
-          <div
-            v-for="span in [1,2,3,4]"
-            :key="span"
-            class="span-btn"
-            :class="{ on: key.span === span }"
-            @click="changeKeySpan(key.id, span)"
-          >
-            {{ span }}
-          </div>
-        </div>
-        <div class="row-info">行{{ key.rowId + 1 }}·{{ ROWS[key.rowId]?.width }}px·{{ key.cnt }}次</div>
-      </div>
-      <div class="add-btns">
-        <button class="add-btn" @click="openModal">+ 键</button>
-      </div>
-    </div>
-
-    <div id="kv-cfg-bottom">
-      <div v-for="row in ROWS" :key="row.id" class="row-config">
-        <div class="rc-label" :style="{ color: row.color }">第{{ row.id + 1 }}行</div>
-        <div class="rc-row">
-          <span class="rc-label-w">宽</span>
-          <input
-            type="range"
-            min="8"
-            max="56"
-            v-model.number="row.width"
-            @change="saveConfig"
-          >
-        </div>
-        <div class="rc-row">
-          <span class="rc-label-w">色</span>
-          <input
-            type="color"
-            v-model="row.color"
-            @change="saveConfig"
-          >
-        </div>
-      </div>
-    </div>
+    <div id="kv-cfg-top"></div>
+    <div id="kv-cfg-bottom"></div>
   </div>
-
-  <!-- 弹窗 -->
-  <div class="kv-modal-overlay" v-if="modalVisible">
+  <!-- 添加按键弹窗 -->
+  <div class="kv-modal-overlay" id="kv-modal">
     <div class="kv-modal-box">
       <h3>添加按键</h3>
-      <input
-        type="text"
-        id="kv-newKeyName"
-        v-model="newKeyName"
-        placeholder="输入按键名（如 L）"
-        autocomplete="off"
-        @keyup.enter="confirmAddKey"
-      >
+      <input type="text" id="kv-newKeyName" placeholder="输入按键名（如 L）">
       <div class="kv-select-group">
         <label>按键类型</label>
         <div class="kv-type-btns">
-          <div
-            class="kv-type-btn normal"
-            :class="{ on: newKeyType === 'normal' }"
-            @click="newKeyType = 'normal'"
-          >
-            普通键
-          </div>
-          <div
-            class="kv-type-btn kps"
-            :class="{ on: newKeyType === 'kps' }"
-            @click="newKeyType = 'kps'"
-          >
-            KPS键
-          </div>
-          <div
-            class="kv-type-btn total"
-            :class="{ on: newKeyType === 'total' }"
-            @click="newKeyType = 'total'"
-          >
-            TOTAL键
-          </div>
+          <div class="kv-type-btn normal on" data-type="normal">普通键</div>
+          <div class="kv-type-btn kps" data-type="kps">KPS键</div>
+          <div class="kv-type-btn total" data-type="total">TOTAL键</div>
         </div>
       </div>
       <div class="kv-select-group">
         <label>绑定行</label>
-        <div class="kv-row-btns">
-          <div
-            v-for="row in ROWS"
-            :key="row.id"
-            class="kv-row-btns"
-            :class="{ on: newKeyRowId === row.id }"
-            @click="newKeyRowId = row.id"
-          >
-            第{{ row.id + 1 }}行
-          </div>
-        </div>
+        <div class="kv-row-btns" id="kv-rowSelectBtns"></div>
       </div>
       <div class="kv-actions">
-        <button class="kv-btn cancel" @click="modalVisible = false">取消</button>
-        <button class="kv-btn ok" @click="confirmAddKey">确定</button>
+        <button class="kv-btn cancel" id="kv-modalCancel">取消</button>
+        <button class="kv-btn ok" id="kv-modalOk">确定</button>
       </div>
     </div>
   </div>
 </div>
-</ClientOnly>
 
 <style>
-/* 样式完全不用改，和你之前的一致即可 */
-#kv-container {
-  position: relative;
-  width: 100%;
-  height: 520px;
-  background: var(--vp-c-bg);
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 8px;
-  overflow: hidden;
-  touch-action: manipulation;
-  user-select: none;
-  -webkit-user-select: none;
-  margin: 24px 0;
-}
-#kv-container #kv-main { position: absolute; inset: 0; bottom: 200px; }
-#kv-container #kv-keys {
-  position: absolute; left: 0; right: 0; bottom: 200px;
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-  gap: 14px; padding: 10px 0; pointer-events: none;
-}
-#kv-container .kv-row { display: flex; gap: 12px; pointer-events: auto; }
-#kv-container .key {
-  min-width: 50px; height: 50px; border: 2px solid var(--vp-c-divider); border-radius: 8px;
-  font-weight: bold; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  font-size: 15px; background: var(--vp-c-bg-soft); color: var(--vp-c-text-1);
-  transition: background-color 0.05s, transform 0.05s, border-color 0.15s; cursor: pointer; position: relative; z-index: 1;
-}
-#kv-container .key.pressed {
-  background: var(--vp-c-brand-dimm); border-color: var(--vp-c-brand); transform: scale(0.96); z-index: 2;
-}
-#kv-container .info-key {
-  background: var(--vp-c-bg-mute) !important; border-color: var(--vp-c-divider-light) !important;
-  color: var(--vp-c-text-2) !important; cursor: default; min-width: 110px; pointer-events: none;
-}
-#kv-container .info-key .kv-val { font-size: 22px; font-weight: bold; }
-#kv-container .kps-key .kv-val { color: #ff9f43; }
-#kv-container .total-key .kv-val { color: #00b96b; }
-#kv-container .kv-lbl { font-size: 9px; color: var(--vp-c-text-3); }
-#kv-container #kv-cfg {
-  position: absolute; bottom: 0; left: 0; right: 0; height: 200px;
-  background: var(--vp-c-bg-soft); border-top: 1px solid var(--vp-c-divider);
-  display: flex; flex-direction: column;
-}
-#kv-container #kv-cfg-top {
-  flex: 1; min-height: 0; display: flex; align-items: flex-start; padding: 10px 12px; gap: 12px;
-  overflow-y: auto; overflow-x: auto;
-}
-#kv-container #kv-cfg-bottom {
-  height: 80px; display: flex; align-items: center; padding: 0 12px; gap: 16px;
-  overflow-x: auto; overflow-y: hidden; flex-shrink: 0;
-}
-#kv-container .cfg-item {
-  display: flex; flex-direction: column; align-items: center; min-width: 72px; max-width: 90px; gap: 3px;
-  position: relative; padding: 6px 4px 4px; border: 1px solid var(--vp-c-divider); border-radius: 6px;
-  background: var(--vp-c-bg-mute); flex-shrink: 0;
-}
-#kv-container .cfg-item .del-btn {
-  position: absolute; top: -5px; right: -5px; width: 15px; height: 15px; border-radius: 50%;
-  background: var(--vp-c-danger); color: var(--vp-c-white); font-size: 10px;
-  display: flex; align-items: center; justify-content: center; cursor: pointer; border: none;
-  z-index: 10; opacity: 0.7; line-height: 1;
-}
-#kv-container .cfg-item .del-btn:hover { opacity: 1; }
-#kv-container .cfg-item .nm { font-size: 12px; color: var(--vp-c-text-1); font-weight: bold; }
-#kv-container .cfg-item .row-btns { display: flex; gap: 2px; margin-bottom: 2px; overflow-x: auto; max-width: 100%; padding-bottom: 2px; scrollbar-width: none; }
-#kv-container .cfg-item .row-btns::-webkit-scrollbar { display: none; }
-#kv-container .cfg-item .row-btn {
-  width: 16px; height: 16px; border-radius: 2px; border: 1px solid var(--vp-c-divider); cursor: pointer;
-  background: var(--vp-c-bg-soft); flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  font-size: 8px; color: var(--vp-c-text-2); transition: all 0.15s;
-}
-#kv-container .cfg-item .row-btn:hover { background: var(--vp-c-bg-mute); }
-#kv-container .cfg-item .row-btn.on { border-color: var(--vp-c-brand); background: var(--vp-c-brand-dimm); color: var(--vp-c-brand-dark); }
-#kv-container .cfg-item .span-btns { display: flex; gap: 1px; margin-bottom: 2px; }
-#kv-container .cfg-item .span-btn {
-  width: 14px; height: 14px; border-radius: 2px; border: 1px solid var(--vp-c-divider); cursor: pointer;
-  font-size: 7px; color: var(--vp-c-text-3); display: flex; align-items: center; justify-content: center;
-  background: var(--vp-c-bg-soft); transition: all 0.15s;
-}
-#kv-container .cfg-item .span-btn.on { border-color: var(--vp-c-brand); color: var(--vp-c-brand-dark); background: var(--vp-c-brand-dimm); }
-#kv-container .cfg-item .row-info { font-size: 8px; color: var(--vp-c-text-3); text-align: center; white-space: nowrap; }
-#kv-container .add-btns { display: flex; flex-direction: column; gap: 6px; margin-left: 12px; padding-left: 12px; border-left: 1px solid var(--vp-c-divider); align-self: flex-start; flex-shrink: 0; }
-#kv-container .add-btn { padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; border: 2px solid var(--vp-c-brand); background: var(--vp-c-bg-soft); color: var(--vp-c-brand); white-space: nowrap; transition: opacity 0.15s; }
-#kv-container .add-btn:hover { opacity: 0.8; }
-#kv-container .row-config { display: flex; flex-direction: column; gap: 3px; min-width: 90px; padding: 4px 6px; border: 1px solid var(--vp-c-divider); border-radius: 4px; flex-shrink: 0; }
-#kv-container .row-config .rc-label { font-size: 10px; color: var(--vp-c-text-2); margin-bottom: 1px; }
-#kv-container .row-config .rc-row { display: flex; align-items: center; gap: 6px; }
-#kv-container .row-config .rc-label-w { font-size: 9px; color: var(--vp-c-text-3); width: 18px; }
-#kv-container .row-config input[type="range"] { width: 48px; height: 12px; }
-#kv-container .row-config input[type="color"] { width: 36px; height: 14px; border: none; background: none; }
-#kv-container .kv-bar { position: absolute; border-radius: 2px; pointer-events: none; will-change: height, bottom, opacity; min-height: 2px; }
-#kv-container .kv-modal-overlay {
-  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); z-index: 99999;
-  display: flex; align-items: center; justify-content: center;
-}
-#kv-container .kv-modal-box {
-  background: var(--vp-c-bg-elv); border: 1px solid var(--vp-c-divider); border-radius: 12px;
-  padding: 20px; width: 320px; max-width: 90vw; box-shadow: var(--vp-shadow-3);
-}
-#kv-container .kv-modal-box h3 { color: var(--vp-c-brand); margin-bottom: 14px; font-size: 16px; text-align: center; }
-#kv-container .kv-modal-box input[type="text"] { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid var(--vp-c-divider); background: var(--vp-c-bg-soft); color: var(--vp-c-text-1); font-size: 14px; margin-bottom: 14px; outline: none; }
-#kv-container .kv-modal-box input[type="text"]:focus { border-color: var(--vp-c-brand); }
-#kv-container .kv-select-group { margin-bottom: 14px; }
-#kv-container .kv-select-group > label { font-size: 10px; color: var(--vp-c-text-2); display: block; margin-bottom: 6px; }
-#kv-container .kv-type-btns { display: flex; gap: 6px; }
-#kv-container .kv-type-btn { flex: 1; padding: 8px; border-radius: 4px; border:2px solid var(--vp-c-divider); cursor: pointer; font-size: 11px; color: var(--vp-c-text-2); text-align: center; background: var(--vp-c-bg-soft); transition: all 0.15s; }
-#kv-container .kv-type-btn.on { border-color: var(--vp-c-brand); color: var(--vp-c-brand-dark); background: var(--vp-c-brand-dimm); }
-#kv-container .kv-type-btn.kps.on { border-color: #ff9f43; background: rgba(255, 159, 67, 0.1); color: #ff9f43; }
-#kv-container .kv-type-btn.total.on { border-color: #00b96b; background: rgba(0, 185, 107, 0.1); color: #00b96b; }
-#kv-container .kv-row-btns { display: flex; gap: 6px; flex-wrap: wrap; }
-#kv-container .kv-row-btns div { padding: 6px 10px; border-radius: 4px; border: 2px solid var(--vp-c-divider); cursor: pointer; font-size: 11px; color: var(--vp-c-text-2); background: var(--vp-c-bg-soft); transition: all 0.15s; }
-#kv-container .kv-row-btns div.on { border-color: var(--vp-c-brand); color: var(--vp-c-brand-dark); background: var(--vp-c-brand-dimm); }
-#kv-container .kv-actions { display: flex; gap: 10px; margin-top: 4px; }
-#kv-container .kv-btn { flex: 1; padding: 10px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; border: none; transition: opacity 0.15s; }
-#kv-container .kv-btn.cancel { background: var(--vp-c-bg-mute); color: var(--vp-c-text-1); }
-#kv-container .kv-btn.ok { background: var(--vp-c-brand); color: var(--vp-c-white); }
-#kv-container .kv-btn:hover { opacity: 0.85; }
+#kv-container { width:100%; height:520px; background:var(--vp-c-bg); border:1px solid var(--vp-c-divider); border-radius:8px; position:relative; overflow:hidden; margin:24px 0; }
+#kv-container #kv-main { position:absolute; inset:0; bottom:200px; }
+#kv-container #kv-keys { position:absolute; left:0; right:0; bottom:200px; display:flex; flex-direction:column; align-items:center; gap:14px; padding:10px 0; pointer-events:none; }
+#kv-container .kv-row { display:flex; gap:12px; pointer-events:auto; }
+#kv-container .key { min-width:50px; height:50px; border:2px solid var(--vp-c-divider); border-radius:8px; font-weight:bold; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:15px; background:var(--vp-c-bg-soft); color:var(--vp-c-text-1); cursor:pointer; transition:all 0.1s; }
+#kv-container .key.pressed { background:var(--vp-c-brand-dimm); border-color:var(--vp-c-brand); transform:scale(0.96); }
+#kv-container .info-key { background:var(--vp-c-bg-mute) !important; cursor:default; min-width:110px; }
+#kv-container .kps-key .kv-val { color:#ff9f43; font-size:22px; }
+#kv-container .total-key .kv-val { color:#00b96b; font-size:22px; }
+#kv-container #kv-cfg { position:absolute; bottom:0; left:0; right:0; height:200px; background:var(--vp-c-bg-soft); border-top:1px solid var(--vp-c-divider); display:flex; flex-direction:column; }
+#kv-container #kv-cfg-top { flex:1; display:flex; gap:12px; padding:10px; overflow:auto; }
+#kv-container #kv-cfg-bottom { height:80px; display:flex; gap:16px; padding:0 12px; align-items:center; overflow:auto; }
+#kv-container .cfg-item { min-width:72px; padding:6px; border:1px solid var(--vp-c-divider); border-radius:6px; background:var(--vp-c-bg-mute); display:flex; flex-direction:column; align-items:center; gap:3px; position:relative; }
+#kv-container .del-btn { position:absolute; top:-5px; right:-5px; width:15px; height:15px; border-radius:50%; background:var(--vp-c-danger); color:white; border:none; cursor:pointer; font-size:10px; }
+#kv-container .row-btn { width:16px; height:16px; border-radius:2px; border:1px solid var(--vp-c-divider); background:var(--vp-c-bg-soft); cursor:pointer; font-size:8px; }
+#kv-container .row-btn.on { border-color:var(--vp-c-brand); background:var(--vp-c-brand-dimm); }
+#kv-container .span-btn { width:14px; height:14px; border-radius:2px; border:1px solid var(--vp-c-divider); background:var(--vp-c-bg-soft); cursor:pointer; font-size:7px; }
+#kv-container .span-btn.on { border-color:var(--vp-c-brand); background:var(--vp-c-brand-dimm); }
+#kv-container .add-btn { padding:8px 14px; border:2px solid var(--vp-c-brand); background:var(--vp-c-bg-soft); color:var(--vp-c-brand); border-radius:6px; cursor:pointer; }
+#kv-container .kv-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:99999; align-items:center; justify-content:center; }
+#kv-container .kv-modal-overlay.show { display:flex; }
+#kv-container .kv-modal-box { background:var(--vp-c-bg-elv); border:1px solid var(--vp-c-divider); border-radius:12px; padding:20px; width:320px; }
+#kv-container .kv-type-btn { flex:1; padding:8px; border:2px solid var(--vp-c-divider); border-radius:4px; cursor:pointer; font-size:11px; text-align:center; }
+#kv-container .kv-type-btn.on { border-color:var(--vp-c-brand); background:var(--vp-c-brand-dimm); }
+#kv-container .kv-btn { flex:1; padding:10px; border:none; border-radius:6px; cursor:pointer; font-weight:bold; }
+#kv-container .kv-btn.cancel { background:var(--vp-c-bg-mute); }
+#kv-container .kv-btn.ok { background:var(--vp-c-brand); color:white; }
+#kv-container .kv-bar { position:absolute; border-radius:2px; pointer-events:none; min-height:2px; }
 </style>
 
-<script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-
-// ===== 纯常量 =====
-const SAVE_KEY = 'keyview_fghj'
-const BAR_SPEED = 300
-const BAR_FADE_DELAY = 1000
-const BAR_FADE_DUR = 2000
-
-// ===== 响应式数据 =====
-const ROWS = ref([
-  { id: 0, width: 52, color: '#ff3366' },
-  { id: 1, width: 40, color: '#ff9f43' },
-  { id: 2, width: 28, color: '#ffcc00' },
-  { id: 3, width: 16, color: '#00ff88' }
-])
-const keys = ref([])
-const nextKeyId = ref(7)
-const kps = ref(0)
-const total = ref(0)
-const pressedKeys = ref(new Set())
-const modalVisible = ref(false)
-const newKeyName = ref('')
-const newKeyType = ref('normal')
-const newKeyRowId = ref(0)
-
-// ===== 计算属性 =====
-const groupedKeys = computed(() => {
-  const map = {}
-  keys.value.forEach(key => {
-    if (!map[key.rowId]) map[key.rowId] = []
-    map[key.rowId].push(key)
-  })
-  return Object.values(map).sort((a, b) => a[0].rowId - b[0].rowId)
-})
-
-// ===== 运行时状态 =====
-let kpsArr = []
-let activeBars = {}
-let rafId = null
-let firstRowBottom = 0
-let mainRect = null
-let barId = 0
-let kpsTimer = null
-
-// ===== 工具函数 =====
-const saveConfig = () => {
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({
-      ROWS: ROWS.value,
-      keys: keys.value,
-      nextKeyId: nextKeyId.value
-    }))
-  } catch {}
-}
-
-const loadConfig = () => {
-  try {
-    const d = JSON.parse(localStorage.getItem(SAVE_KEY))
-    if (d) {
-      ROWS.value = d.ROWS || ROWS.value
-      keys.value = d.keys || keys.value
-      nextKeyId.value = d.nextKeyId || nextKeyId.value
-      total.value = keys.value.reduce((sum, k) => sum + (k.cnt || 0), 0)
-    }
-  } catch {}
-}
-
-// ===== 动画逻辑（补了缺失的keyId属性）=====
-const tick = (now) => {
-  let has = false
-  for (const id in activeBars) {
-    const bar = activeBars[id]
-    const dt = now - bar.lastTime
-    bar.lastTime = now
-
-    if (bar.state === 'growing') {
-      bar.height += BAR_SPEED * dt / 1000
-      bar.el.style.height = Math.max(bar.height, 2) + 'px'
-      bar.el.style.bottom = firstRowBottom + 'px'
-      has = true
-    } else if (bar.state === 'rising') {
-      bar.riseT += dt
-      if (bar.riseT < BAR_FADE_DELAY) {
-        bar.el.style.bottom = (firstRowBottom + BAR_SPEED * bar.riseT / 1000) + 'px'
-        has = true
-      } else {
-        bar.state = 'fading'
-        bar.fadeT = 0
-        bar.riseBefore = BAR_SPEED * (BAR_FADE_DELAY / 1000)
-      }
-    } else if (bar.state === 'fading') {
-      bar.fadeT += dt
-      if (bar.fadeT < BAR_FADE_DUR) {
-        bar.el.style.bottom = (firstRowBottom + bar.riseBefore + BAR_SPEED * bar.fadeT / 1000) + 'px'
-        bar.el.style.opacity = (1 - bar.fadeT / BAR_FADE_DUR).toString()
-        has = true
-      } else {
-        bar.el.remove()
-        delete activeBars[id]
-      }
-    }
-  }
-  rafId = has ? requestAnimationFrame(tick) : null
-}
-
-const spawnBar = (keyId) => {
-  const key = keys.value.find(k => k.id === keyId)
-  if (!key || !mainRect) return
-  const row = ROWS.value.find(r => r.id === key.rowId)
-  const keyEl = document.querySelector(`#kv-container .key[data-id="${keyId}"]`)
-  if (!keyEl) return
-  const kr = keyEl.getBoundingClientRect()
-
-  const bar = document.createElement('div')
-  bar.className = 'kv-bar'
-  bar.style.cssText = `
-    width:${row.width}px;height:2px;background:${row.color};
-    box-shadow:0 0 6px ${row.color},0 0 12px ${row.color}66;
-    left:${kr.left + kr.width/2 - row.width/2 - mainRect.left}px;
-    bottom:${firstRowBottom}px;opacity:1;border-radius:2px;pointer-events:none;
-  `
-  document.querySelector('#kv-container #kv-main').appendChild(bar)
-
-  // ✅ 补了keyId属性，之前漏了导致triggerUp匹配不到
-  activeBars[++barId] = {
-    el: bar,
-    keyId: keyId, // 关键修复！
-    state: 'growing',
-    lastTime: performance.now(),
-    height: 2,
-    riseT: 0,
-    fadeT: 0,
-    riseBefore: 0
-  }
-  if (!rafId) rafId = requestAnimationFrame(tick)
-}
-
-// ===== 键盘逻辑 =====
-const triggerDown = (code) => {
-  if (pressedKeys.value.has(code)) return
-  pressedKeys.value.add(code)
-
-  const normalKeys = keys.value.filter(k => k.code === code && k.type === 'normal')
-  normalKeys.forEach(key => {
-    key.cnt++
-    total.value++
-    spawnBar(key.id)
-  })
-
-  kpsArr.push(Date.now())
-  saveConfig()
-}
-
-const triggerUp = (code) => {
-  if (!pressedKeys.value.has(code)) return
-  pressedKeys.value.delete(code)
-
-  keys.value.filter(k => k.code === code).forEach(key => {
-    for (const id in activeBars) {
-      // 现在能正确匹配到keyId了
-      if (activeBars[id].keyId === key.id && activeBars[id].state === 'growing') {
-        activeBars[id].state = 'rising'
-        activeBars[id].riseT = 0
-      }
-    }
-  })
-}
-
-// ===== 配置操作 =====
-const deleteKey = (id) => {
-  keys.value = keys.value.filter(k => k.id !== id)
-  saveConfig()
-}
-
-const changeKeyRow = (id, rowId) => {
-  const key = keys.value.find(k => k.id === id)
-  if (key) {
-    key.rowId = rowId
-    saveConfig()
-  }
-}
-
-const changeKeySpan = (id, span) => {
-  const key = keys.value.find(k => k.id === id)
-  if (key) {
-    key.span = span
-    saveConfig()
-  }
-}
-
-const openModal = () => {
-  newKeyName.value = ''
-  newKeyType.value = 'normal'
-  newKeyRowId.value = 0
-  modalVisible.value = true
-  setTimeout(() => document.getElementById('kv-newKeyName')?.focus(), 50)
-}
-
-const confirmAddKey = () => {
-  const label = newKeyName.value.trim() || 'N'
-  let code = ''
-  if (newKeyType.value === 'kps') {
-    code = `KPS_${nextKeyId.value}`
-  } else if (newKeyType.value === 'total') {
-    code = `TOTAL_${nextKeyId.value}`
-  } else {
-    code = `Key${label.toUpperCase()}`
-  }
-
-  keys.value.push({
-    id: nextKeyId.value++,
-    label,
-    code,
-    rowId: newKeyRowId.value,
-    cnt: 0,
-    type: newKeyType.value,
-    span: 1
-  })
-  saveConfig()
-  modalVisible.value = false
-}
-
-// ===== 核心修复：用nextTick等待<ClientOnly>内容渲染完成 =====
-onMounted(async () => {
-  // ✅ 等<ClientOnly>里的内容完全插入DOM后再执行初始化
-  await nextTick()
-
-  // 加载本地配置
-  loadConfig()
-  if (keys.value.length === 0) {
-    keys.value = [
-      { id: 1, label: 'F', code: 'KeyF', rowId: 0, cnt: 0, type: 'normal', span: 1 },
-      { id: 2, label: 'G', code: 'KeyG', rowId: 0, cnt: 0, type: 'normal', span: 1 },
-      { id: 3, label: 'H', code: 'KeyH', rowId: 0, cnt: 0, type: 'normal', span: 1 },
-      { id: 4, label: 'J', code: 'KeyJ', rowId: 0, cnt: 0, type: 'normal', span: 1 },
-      { id: 5, label: 'KPS', code: 'KPS_INFO', rowId: 1, cnt: 0, type: 'kps', span: 2 },
-      { id: 6, label: 'TOTAL', code: 'TOTAL_INFO', rowId: 1, cnt: 0, type: 'total', span: 2 }
-    ]
-    nextKeyId.value = 7
-    saveConfig()
-  }
-
-  // 计算按键位置（此时DOM已存在）
-  const calcBottom = () => {
-    const main = document.querySelector('#kv-container #kv-main')
-    if (!main) return
-    mainRect = main.getBoundingClientRect()
-    const firstKey = document.querySelector('#kv-container .key:not(.info-key)')
-    if (!firstKey) {
-      firstRowBottom = mainRect.height * 0.5
-      return
-    }
-    let el = firstKey, top = 0
-    while (el && el !== document.body) {
-      top += el.offsetTop || 0
-      el = el.offsetParent
-    }
-    firstRowBottom = mainRect.height - top
-    if (firstRowBottom < 20) firstRowBottom = 20
-    if (firstRowBottom > mainRect.height - 10) firstRowBottom = mainRect.height - 10
-  }
-
-  // 等DOM更新后再计算位置
-  await nextTick()
-  calcBottom()
-  window.addEventListener('resize', calcBottom)
-
-  // KPS更新定时器
-  kpsTimer = setInterval(() => {
-    const now = Date.now()
-    kpsArr = kpsArr.filter(t => now - t < 1000)
-    kps.value = kpsArr.length
-  }, 200)
-
-  // 全局键盘监听
-  const keydownHandler = (e) => {
-    if (modalVisible.value) {
-      if (e.key === 'Escape') modalVisible.value = false
-      return
-    }
-    const isInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable
-    if (!isInput) e.preventDefault()
-    triggerDown(e.code)
-  }
-
-  const keyupHandler = (e) => {
-    if (modalVisible.value) return
-    const isInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable
-    if (!isInput) e.preventDefault()
-    triggerUp(e.code)
-  }
-
-  window.addEventListener('keydown', keydownHandler, true)
-  window.addEventListener('keyup', keyupHandler, true)
-
-  // 失焦清理
-  const blurHandler = () => {
-    pressedKeys.value.clear()
-    for (const id in activeBars) {
-      if (activeBars[id].state === 'growing') {
-        activeBars[id].state = 'rising'
-        activeBars[id].riseT = 0
-      }
-    }
-  }
-  window.addEventListener('blur', blurHandler)
-
-  // 清理函数
-  onUnmounted(() => {
-    window.removeEventListener('keydown', keydownHandler, true)
-    window.removeEventListener('keyup', keyupHandler, true)
-    window.removeEventListener('blur', blurHandler)
-    window.removeEventListener('resize', calcBottom)
-    clearInterval(kpsTimer)
-    if (rafId) cancelAnimationFrame(rafId)
-  })
-})
+<script>
+if (typeof window === 'undefined') return;
+window.addEventListener('DOMContentLoaded', () => {
+  const SAVE_KEY = 'keyview_page';
+  const BAR_SPEED = 300;
+  const ROWS = [{ id: 0, width: 52, color: '#ff3366' },{ id: 1, width: 40, color: '#ff9f43' },{ id: 2, width: 28, color: '#ffcc00' },{ id: 3, width: 16, color: '#00ff88' }];
+  let keys = [{ id: 1, label: 'F', code: 'KeyF', rowId: 0, cnt: 0, type: 'normal', span: 1 },{ id: 2, label: 'G', code: 'KeyG', rowId: 0, cnt: 0, type: 'normal', span: 1 },{ id: 3, label: 'H', code: 'KeyH', rowId: 0, cnt: 0, type: 'normal', span: 1 },{ id: 4, label: 'J', code: 'KeyJ', rowId: 0, cnt: 0, type: 'normal', span: 1 },{ id: 5, label: 'KPS', code: 'KPS_INFO', rowId: 1, cnt: 0, type: 'kps', span: 2 },{ id: 6, label: 'TOTAL', code: 'TOTAL_INFO', rowId: 1, cnt: 0, type: 'total', span: 2 }];
+  let nextKeyId = 7, pressedKeys = new Set(), activeBars = {}, barId = 0, kpsRecords = [], firstRowBottom = 0, mainRect = null;
+  const $ = sel => document.querySelector(`#kv-container ${sel}`);
+  const $$ = sel => document.querySelectorAll(`#kv-container ${sel}`);
+  const saveConfig = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ keys, nextKeyId, ROWS })); } catch {} };
+  const loadConfig = () => { try { const d = JSON.parse(localStorage.getItem(SAVE_KEY)); d && (keys = d.keys || keys, nextKeyId = d.nextKeyId || nextKeyId, ROWS.splice(0, ROWS.length, ...(d.ROWS || ROWS))); } catch {} };
+  const renderKeys = () => {
+    const c = $('#kv-keys'); c.innerHTML = '';
+    const rm = {}; keys.forEach(k => (rm[k.rowId] ||= []).push(k));
+    Object.values(rm).sort((a,b)=>a[0].rowId-b[0].rowId).forEach(rk => {
+      const rd = document.createElement('div'); rd.className = 'kv-row';
+      rk.forEach(k => {
+        const kd = document.createElement('div'); kd.className = 'key'; kd.dataset.id = k.id; kd.dataset.code = k.code; kd.style.width = `${50 + (k.span-1)*56}px`;
+        if (k.type === 'kps') { kd.innerHTML = '<span class="kv-lbl">KPS</span><span class="kv-val">0</span>'; kd.classList.add('info-key','kps-key'); }
+        else if (k.type === 'total') { kd.innerHTML = '<span class="kv-lbl">TOTAL</span><span class="kv-val">0</span>'; kd.classList.add('info-key','total-key'); }
+        else { kd.innerHTML = `${k.label}<span class="kv-cnt">${k.cnt}</span>`; kd.addEventListener('mousedown', ()=>handleKeyDown(k.code)); kd.addEventListener('mouseup', ()=>handleKeyUp(k.code)); kd.addEventListener('touchstart', e=>{e.preventDefault();handleKeyDown(k.code)}); kd.addEventListener('touchend', e=>{e.preventDefault();handleKeyUp(k.code)}); }
+        rd.appendChild(kd);
+      }); c.appendChild(rd);
+    }); updateInfo();
+    const m = $('#kv-main'); mainRect = m.getBoundingClientRect();
+    const fk = $('.key:not(.info-key)'); if (fk) { let el=fk,t=0; while(el&&el!==document.body){t+=el.offsetTop||0;el=el.offsetParent;} firstRowBottom = mainRect.height - t; }
+  };
+  const renderCfg = () => {
+    const t = $('#kv-cfg-top'); t.innerHTML = '';
+    keys.forEach(k => {
+      const i = document.createElement('div'); i.className = 'cfg-item'; i.innerHTML = `<button class="del-btn" data-id="${k.id}">×</button><span class="nm">${k.label}</span><div class="row-btns">${ROWS.map(r=>`<div class="row-btn ${k.rowId===r.id?'on':''}" data-id="${k.id}" data-rid="${r.id}">${r.id+1}</div>`).join('')}</div><div class="span-btns">${[1,2,3,4].map(s=>`<div class="span-btn ${k.span===s?'on':''}" data-id="${k.id}" data-span="${s}">${s}</div>`).join('')}</div>`;
+      t.appendChild(i);
+    });
+    t.querySelectorAll('.del-btn').forEach(b=>b.addEventListener('click',e=>{keys=keys.filter(k=>k.id!==+e.target.dataset.id);saveConfig();renderKeys();renderCfg();}));
+    t.querySelectorAll('.row-btn').forEach(b=>b.addEventListener('click',e=>{const id=+e.target.dataset.id,rid=+e.target.dataset.rid;keys.forEach(k=>k.id===id&&(k.rowId=rid));saveConfig();renderKeys();renderCfg();}));
+    t.querySelectorAll('.span-btn').forEach(b=>b.addEventListener('click',e=>{const id=+e.target.dataset.id,s=+e.target.dataset.span;keys.forEach(k=>k.id===id&&(k.span=s));saveConfig();renderKeys();renderCfg();}));
+    const ab = document.createElement('div'); ab.className='add-btns'; ab.innerHTML='<button class="add-btn">+ 键</button>'; ab.querySelector('.add-btn').addEventListener('click', openModal); t.appendChild(ab);
+  };
+  const handleKeyDown = code => {
+    if (pressedKeys.has(code)) return; pressedKeys.add(code);
+    $$(`.key[data-code="${code}"]`).forEach(el=>el.classList.add('pressed'));
+    keys.filter(k=>k.code===code&&k.type==='normal').forEach(k=>{k.cnt++;$(`.key[data-id="${k.id}"] .kv-cnt`).innerText=k.cnt;spawnBar(k.id);});
+    kpsRecords.push(Date.now()); saveConfig();
+  };
+  const handleKeyUp = code => { if(!pressedKeys.has(code))return; pressedKeys.delete(code); $$(`.key[data-code="${code}"]`).forEach(el=>el.classList.remove('pressed')); };
+  const spawnBar = keyId => {
+    const k=keys.find(x=>x.id===keyId), r=ROWS.find(r=>r.id===k.rowId), ke=$(`.key[data-id="${keyId}"]`);
+    if(!k||!r||!ke||!mainRect)return; const kr=ke.getBoundingClientRect();
+    const b=document.createElement('div'); b.className='kv-bar'; b.style.cssText=`width:${r.width}px;height:2px;background:${r.color};left:${kr.left+kr.width/2-r.width/2-mainRect.left}px;bottom:${firstRowBottom}px;opacity:1;`;
+    $('#kv-main').appendChild(b); activeBars[++barId]={el:b,y:firstRowBottom,speed:BAR_SPEED}; animateBars();
+  };
+  const animateBars = () => { let ha=false; for(const id in activeBars){const b=activeBars[id];b.y+=b.speed*0.016;b.el.style.bottom=`${b.y}px`;b.el.style.opacity=Math.max(0,1-(b.y-firstRowBottom)/200);if(b.y<firstRowBottom+200)ha=true;else{b.el.remove();delete activeBars[id];}} ha&&requestAnimationFrame(animateBars); };
+  const updateInfo = () => { const n=Date.now();kpsRecords=kpsRecords.filter(t=>n-t<1000);const kps=kpsRecords.length,total=keys.reduce((s,k)=>s+(k.cnt||0),0);$$('.kps-key .kv-val').forEach(el=>el.innerText=kps);$$('.total-key .kv-val').forEach(el=>el.innerText=total); };
+  const openModal = () => { const rb=$('#kv-rowSelectBtns'); rb.innerHTML=ROWS.map(r=>`<div class="kv-row-btns" data-rid="${r.id}">第${r.id+1}行</div>`).join(''); rb.querySelectorAll('div').forEach(b=>b.addEventListener('click',()=>{rb.querySelectorAll('div').forEach(d=>d.classList.remove('on'));b.classList.add('on');})); rb.querySelector('div').classList.add('on'); $$('.kv-type-btn').forEach(b=>b.addEventListener('click',()=>{$$('.kv-type-btn').forEach(d=>d.classList.remove('on'));b.classList.add('on');})); $('#kv-modal').classList.add('show'); $('#kv-newKeyName').focus(); };
+  $('#kv-modalOk').addEventListener('click',()=>{const l=$('#kv-newKeyName').value.trim()||'N',t=$('.kv-type-btn.on').dataset.type,rid=+$('.kv-row-btns.on').dataset.rid,co=t==='kps'?`KPS_${nextKeyId}`:t==='total'?`TOTAL_${nextKeyId}`:`Key${l.toUpperCase()}`; keys.push({id:nextKeyId++,label:l,code:co,rowId:rid,cnt:0,type:t,span:1}); saveConfig();renderKeys();renderCfg();$('#kv-modal').classList.remove('show');});
+  $('#kv-modalCancel').addEventListener('click',()=>$('#kv-modal').classList.remove('show'));
+  window.addEventListener('keydown',e=>{if($('#kv-modal').classList.contains('show')){if(e.key==='Escape')$('#kv-modal').classList.remove('show');return;} const ii=['INPUT','TEXTAREA'].includes(document.activeElement.tagName);if(!ii)e.preventDefault();handleKeyDown(e.code);});
+  window.addEventListener('keyup',e=>{if($('#kv-modal').classList.contains('show'))return;const ii=['INPUT','TEXTAREA'].includes(document.activeElement.tagName);if(!ii)e.preventDefault();handleKeyUp(e.code);});
+  loadConfig(); renderKeys(); renderCfg(); setInterval(updateInfo,200);
+  window.addEventListener('resize',()=>{const m=$('#kv-main');mainRect=m.getBoundingClientRect();const fk=$('.key:not(.info-key)');if(fk){let el=fk,t=0;while(el&&el!==document.body){t+=el.offsetTop||0;el=el.offsetParent;}firstRowBottom=mainRect.height-t;}});
+});
 </script>
 
-# 该工具有什么用处？
+## 该工具有什么用处？
 可用于显示游戏中输入的按键，如果您发布视频的话，这实际上可以很方便地给观众查看手法。
