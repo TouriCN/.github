@@ -160,18 +160,16 @@
 </style>
 
 <script setup>
-import { onUnmounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 
-// ✅ 构建阶段直接短路，彻底规避SSR编译报错
-if (typeof window === 'undefined') {
-
-/* ========== 配置 ========== */
+/* ========== 纯常量配置（无浏览器API，构建安全） ========== */
 const SAVE_KEY = 'keyview_fghj'
 const BAR_SPEED = 300
 const BAR_FADE_DELAY = 1000
 const BAR_FADE_DUR = 2000
 
 /* ========== 基础数据 ========== */
+// 4行配置
 const ROWS = [
   { id: 0, width: 52, color: '#ff3366' },
   { id: 1, width: 40, color: '#ff9f43' },
@@ -179,6 +177,7 @@ const ROWS = [
   { id: 3, width: 16, color: '#00ff88' }
 ]
 
+// 初始布局：第一行FGHJ，第二行KPS+TOTAL
 let keys = [
   { id: 1, label: 'F', code: 'KeyF', rowId: 0, cnt: 0, type: 'normal', span: 1 },
   { id: 2, label: 'G', code: 'KeyG', rowId: 0, cnt: 0, type: 'normal', span: 1 },
@@ -199,13 +198,16 @@ let mainRect = null
 let barId = 0
 let kpsTimer = null
 
-/* ========== DOM快捷查询 ========== */
+/* ========== DOM快捷查询（仅定义，不调用） ========== */
 const $ = sel => document.querySelector(`#kv-container ${sel}`)
 const $$ = sel => document.querySelectorAll(`#kv-container ${sel}`)
 
 /* ========== 工具函数 ========== */
+// 本地存储
 const save = () => {
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ROWS, keys, nextKeyId })) } catch {}
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ROWS, keys, nextKeyId }))
+  } catch {}
 }
 
 const load = () => {
@@ -219,23 +221,34 @@ const load = () => {
   } catch {}
 }
 
+// 计算第一行按键底部位置
 const calcBottom = () => {
   const main = $('#kv-main')
   if (!main) return
   mainRect = main.getBoundingClientRect()
   const firstKey = $('.key:not(.info-key)')
-  if (!firstKey) { firstRowBottom = mainRect.height * 0.5; return }
+  if (!firstKey) {
+    firstRowBottom = mainRect.height * 0.5
+    return
+  }
   let el = firstKey, top = 0
-  while (el && el !== document.body) { top += el.offsetTop || 0; el = el.offsetParent }
+  while (el && el !== document.body) {
+    top += el.offsetTop || 0
+    el = el.offsetParent
+  }
   firstRowBottom = mainRect.height - top
   if (firstRowBottom < 20) firstRowBottom = 20
   if (firstRowBottom > mainRect.height - 10) firstRowBottom = mainRect.height - 10
 }
 
+// 动画循环
 const tick = (now) => {
   let has = false
   for (const id in active) {
-    const h = active[id], dt = now - h.lastTime; h.lastTime = now
+    const h = active[id]
+    const dt = now - h.lastTime
+    h.lastTime = now
+
     if (h.state === 'growing') {
       h.height += BAR_SPEED * dt / 1000
       h.bar.style.height = Math.max(h.height, 2) + 'px'
@@ -246,19 +259,27 @@ const tick = (now) => {
       if (h.riseT < BAR_FADE_DELAY) {
         h.bar.style.bottom = (firstRowBottom + BAR_SPEED * h.riseT / 1000) + 'px'
         has = true
-      } else { h.state = 'fading'; h.fadeT = 0; h.riseBefore = BAR_SPEED * (BAR_FADE_DELAY / 1000) }
+      } else {
+        h.state = 'fading'
+        h.fadeT = 0
+        h.riseBefore = BAR_SPEED * (BAR_FADE_DELAY / 1000)
+      }
     } else if (h.state === 'fading') {
       h.fadeT += dt
       if (h.fadeT < BAR_FADE_DUR) {
         h.bar.style.bottom = (firstRowBottom + h.riseBefore + BAR_SPEED * h.fadeT / 1000) + 'px'
         h.bar.style.opacity = (1 - h.fadeT / BAR_FADE_DUR).toString()
         has = true
-      } else { h.bar.remove(); delete active[id] }
+      } else {
+        h.bar.remove()
+        delete active[id]
+      }
     }
   }
   rafId = has ? requestAnimationFrame(tick) : null
 }
 
+// 生成上升条
 const spawnBar = (keyId) => {
   const k = keys.find(x => x.id === keyId)
   if (!k) return
@@ -266,22 +287,35 @@ const spawnBar = (keyId) => {
   const sample = $(`.key[data-id="${keyId}"]`)
   if (!sample || !mainRect) return
   const kr = sample.getBoundingClientRect()
+
   const bar = document.createElement('div')
   bar.className = 'kv-bar'
-  bar.style.cssText = `width:${row.width}px;height:2px;background:${row.color};box-shadow:0 0 6px ${row.color},0 0 12px ${row.color}66;left:${kr.left + kr.width/2 - row.width/2 - mainRect.left}px;bottom:${firstRowBottom}px;opacity:1;border-radius:2px;pointer-events:none;`
+  bar.style.cssText = `
+    width:${row.width}px;height:2px;background:${row.color};
+    box-shadow:0 0 6px ${row.color},0 0 12px ${row.color}66;
+    left:${kr.left + kr.width/2 - row.width/2 - mainRect.left}px;
+    bottom:${firstRowBottom}px;opacity:1;border-radius:2px;pointer-events:none;
+  `
   $('#kv-main').appendChild(bar)
-  active[++barId] = { bar, keyId, state: 'growing', lastTime: performance.now(), height: 2, riseT: 0, fadeT: 0, riseBefore: 0 }
+
+  active[++barId] = {
+    bar, keyId, state: 'growing', lastTime: performance.now(),
+    height: 2, riseT: 0, fadeT: 0, riseBefore: 0
+  }
   if (!rafId) rafId = requestAnimationFrame(tick)
 }
 
+// 键盘事件处理
 const triggerDown = (code) => {
   if (physicalPressed.has(code)) return
   physicalPressed.add(code)
+  
   keys.filter(k => k.code === code && k.type === 'normal').forEach(k => {
     k.cnt++
     $$(`.key[data-id="${k.id}"] .kv-cnt`).forEach(el => el.innerText = k.cnt)
     spawnBar(k.id)
   })
+  
   kpsArr.push(Date.now())
   save()
   syncHighlight(code)
@@ -290,6 +324,7 @@ const triggerDown = (code) => {
 const triggerUp = (code) => {
   if (!physicalPressed.has(code)) return
   physicalPressed.delete(code)
+  
   keys.filter(k => k.code === code).forEach(k => {
     for (const id in active) {
       if (active[id].keyId === k.id && active[id].state === 'growing') {
@@ -308,12 +343,14 @@ const syncHighlight = (code) => {
   })
 }
 
+// 渲染按键
 const renderKeys = () => {
   const c = $('#kv-keys')
   if (!c) return
   c.innerHTML = ''
   const map = {}
   keys.forEach(k => (map[k.rowId] = map[k.rowId] || []).push(k))
+  
   Object.keys(map).sort().forEach(rid => {
     const rd = document.createElement('div')
     rd.className = 'kv-row'
@@ -324,6 +361,7 @@ const renderKeys = () => {
       d.dataset.code = k.code
       d.dataset.id = k.id
       d.style.width = (50 + (k.span - 1) * 56) + 'px'
+      
       if (k.type === 'kps') {
         d.innerHTML = '<span class="kv-lbl">KPS</span><span class="kv-val">0</span>'
         d.classList.add('info-key', 'kps-key')
@@ -332,8 +370,12 @@ const renderKeys = () => {
         d.classList.add('info-key', 'total-key')
       } else {
         d.innerHTML = `${k.label}<span class="kv-cnt">${k.cnt || 0}</span>`
-        ;['mousedown', 'touchstart'].forEach(ev => d.addEventListener(ev, () => triggerDown(k.code), { passive: false }))
-        ;['mouseup', 'touchend', 'touchcancel', 'mouseleave'].forEach(ev => d.addEventListener(ev, () => triggerUp(k.code), { passive: false }))
+        ;['mousedown', 'touchstart'].forEach(ev => 
+          d.addEventListener(ev, () => triggerDown(k.code), { passive: false })
+        )
+        ;['mouseup', 'touchend', 'touchcancel', 'mouseleave'].forEach(ev =>
+          d.addEventListener(ev, () => triggerUp(k.code), { passive: false })
+        )
       }
       rd.appendChild(d)
     })
@@ -343,6 +385,7 @@ const renderKeys = () => {
   requestAnimationFrame(() => requestAnimationFrame(calcBottom))
 }
 
+// 更新KPS/TOTAL
 const updateInfo = () => {
   const now = Date.now()
   kpsArr = kpsArr.filter(t => now - t < 1000)
@@ -352,72 +395,119 @@ const updateInfo = () => {
   $$('.total-key .kv-val').forEach(el => el.innerText = tot)
 }
 
+// 渲染配置面板
 const renderCfg = () => {
   const top = $('#kv-cfg-top')
   if (!top) return
   top.innerHTML = ''
+  
   keys.forEach(k => {
     const row = ROWS.find(r => r.id === k.rowId)
     const item = document.createElement('div')
     item.className = 'cfg-item'
-    item.innerHTML = `<button class="del-btn" data-id="${k.id}">×</button><span class="nm">${k.label}</span><div class="row-btns">${ROWS.map(r => `<div class="row-btn ${k.rowId===r.id?'on':''}" data-id="${k.id}" data-rid="${r.id}">${r.id+1}</div>`).join('')}</div><div class="span-btns">${[1,2,3,4].map(s => `<div class="span-btn ${k.span===s?'on':''}" data-id="${k.id}" data-span="${s}">${s}</div>`).join('')}</div><div class="row-info">行${row.id+1}·${row.width}px·${k.cnt}次</div>`
+    item.innerHTML = `
+      <button class="del-btn" data-id="${k.id}">×</button>
+      <span class="nm">${k.label}</span>
+      <div class="row-btns">${ROWS.map(r => `<div class="row-btn ${k.rowId===r.id?'on':''}" data-id="${k.id}" data-rid="${r.id}">${r.id+1}</div>`).join('')}</div>
+      <div class="span-btns">${[1,2,3,4].map(s => `<div class="span-btn ${k.span===s?'on':''}" data-id="${k.id}" data-span="${s}">${s}</div>`).join('')}</div>
+      <div class="row-info">行${row.id+1}·${row.width}px·${k.cnt}次</div>
+    `
     top.appendChild(item)
   })
-  top.querySelectorAll('.del-btn').forEach(btn => btn.addEventListener('click', e => {
-    e.stopPropagation()
-    keys = keys.filter(k => k.id !== +btn.dataset.id)
-    save(); renderKeys(); renderCfg()
-  }))
-  top.querySelectorAll('.row-btn').forEach(btn => btn.addEventListener('click', e => {
-    e.stopPropagation()
-    const kid = +btn.dataset.id, rid = +btn.dataset.rid
-    keys.forEach(k => k.id === kid && (k.rowId = rid))
-    save(); renderKeys(); renderCfg()
-  }))
-  top.querySelectorAll('.span-btn').forEach(btn => btn.addEventListener('click', e => {
-    e.stopPropagation()
-    const kid = +btn.dataset.id, s = +btn.dataset.span
-    keys.forEach(k => k.id === kid && (k.span = s))
-    save(); renderKeys(); renderCfg()
-  }))
+
+  // 删除按键
+  top.querySelectorAll('.del-btn').forEach(btn => 
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      keys = keys.filter(k => k.id !== +btn.dataset.id)
+      save()
+      renderKeys()
+      renderCfg()
+    })
+  )
+
+  // 切换绑定行
+  top.querySelectorAll('.row-btn').forEach(btn =>
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const kid = +btn.dataset.id, rid = +btn.dataset.rid
+      keys.forEach(k => k.id === kid && (k.rowId = rid))
+      save()
+      renderKeys()
+      renderCfg()
+    })
+  )
+
+  // 切换跨度
+  top.querySelectorAll('.span-btn').forEach(btn =>
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const kid = +btn.dataset.id, s = +btn.dataset.span
+      keys.forEach(k => k.id === kid && (k.span = s))
+      save()
+      renderKeys()
+      renderCfg()
+    })
+  )
+
+  // 添加按键按钮
   const addBtns = document.createElement('div')
   addBtns.className = 'add-btns'
   addBtns.innerHTML = '<button class="add-btn">+ 键</button>'
   addBtns.querySelector('.add-btn').addEventListener('click', openModal)
   top.appendChild(addBtns)
+
+  // 底部行配置
   const bot = $('#kv-cfg-bottom')
   bot.innerHTML = ''
   ROWS.forEach(row => {
     const rc = document.createElement('div')
     rc.className = 'row-config'
-    rc.innerHTML = `<div class="rc-label" style="color:${row.color}">第${row.id+1}行</div><div class="rc-row"><span class="rc-label-w">宽</span><input type="range" min="8" max="56" value="${row.width}" data-rid="${row.id}"></div><div class="rc-row"><span class="rc-label-w">色</span><input type="color" value="${row.color}" data-rid="${row.id}"></div>`
+    rc.innerHTML = `
+      <div class="rc-label" style="color:${row.color}">第${row.id+1}行</div>
+      <div class="rc-row"><span class="rc-label-w">宽</span><input type="range" min="8" max="56" value="${row.width}" data-rid="${row.id}"></div>
+      <div class="rc-row"><span class="rc-label-w">色</span><input type="color" value="${row.color}" data-rid="${row.id}"></div>
+    `
     bot.appendChild(rc)
   })
-  bot.querySelectorAll('input[type="range"]').forEach(input => input.addEventListener('input', function() {
-    const r = ROWS.find(r => r.id == this.dataset.rid)
-    if (r) { r.width = +this.value; save() }
-  }))
-  bot.querySelectorAll('input[type="color"]').forEach(input => input.addEventListener('input', function() {
-    const r = ROWS.find(r => r.id == this.dataset.rid)
-    if (r) { r.color = this.value; save(); renderCfg() }
-  }))
+
+  bot.querySelectorAll('input[type="range"]').forEach(input =>
+    input.addEventListener('input', function() {
+      const r = ROWS.find(r => r.id == this.dataset.rid)
+      if (r) { r.width = +this.value; save() }
+    })
+  )
+
+  bot.querySelectorAll('input[type="color"]').forEach(input =>
+    input.addEventListener('input', function() {
+      const r = ROWS.find(r => r.id == this.dataset.rid)
+      if (r) { r.color = this.value; save(); renderCfg() }
+    })
+  )
 }
 
+// 弹窗逻辑
 const openModal = () => {
   const rb = $('#kv-rowSelectBtns')
   rb.innerHTML = ROWS.map(r => `<div class="kv-row-btns" data-rid="${r.id}">第${r.id+1}行</div>`).join('')
-  rb.querySelectorAll('div').forEach(btn => btn.addEventListener('click', e => {
-    e.preventDefault()
-    rb.querySelectorAll('div').forEach(x => x.classList.remove('on'))
-    btn.classList.add('on')
-  }))
+  rb.querySelectorAll('div').forEach(btn => 
+    btn.addEventListener('click', e => {
+      e.preventDefault()
+      rb.querySelectorAll('div').forEach(x => x.classList.remove('on'))
+      btn.classList.add('on')
+    })
+  )
   rb.querySelector('div').classList.add('on')
-  $$('.kv-type-btn').forEach(btn => btn.addEventListener('click', e => {
-    e.preventDefault()
-    $$('.kv-type-btn').forEach(x => x.classList.remove('on'))
-    btn.classList.add('on')
-  }))
+
+  $$('.kv-type-btn').forEach(btn =>
+    btn.addEventListener('click', e => {
+      e.preventDefault()
+      $$('.kv-type-btn').forEach(x => x.classList.remove('on'))
+      btn.classList.add('on')
+    })
+  )
   $('.kv-type-btn.normal').classList.add('on')
+
   $('#kv-newKeyName').value = ''
   $('#kv-modal').classList.add('show')
   setTimeout(() => $('#kv-newKeyName').focus(), 50)
@@ -428,9 +518,15 @@ $('#kv-modalOk').addEventListener('click', e => {
   const label = $('#kv-newKeyName').value.trim() || 'N'
   const type = $('.kv-type-btn.on').dataset.type
   const rowId = +$('.kv-row-btns .on').dataset.rid
-  let code = type === 'kps' ? `KPS_${nextKeyId}` : type === 'total' ? `TOTAL_${nextKeyId}` : `Key${label.toUpperCase()}`
+  let code = ''
+  if (type === 'kps') code = 'KPS_' + nextKeyId
+  else if (type === 'total') code = 'TOTAL_' + nextKeyId
+  else code = 'Key' + label.toUpperCase()
+  
   keys.push({ id: nextKeyId++, label, code, rowId, cnt: 0, type, span: 1 })
-  save(); renderKeys(); renderCfg()
+  save()
+  renderKeys()
+  renderCfg()
   $('#kv-modal').classList.remove('show')
 })
 
@@ -439,56 +535,68 @@ $('#kv-modalCancel').addEventListener('click', e => {
   $('#kv-modal').classList.remove('show')
 })
 
-/* ========== 事件绑定 ========== */
-const keydownHandler = (e) => {
-  if ($('#kv-modal').classList.contains('show')) {
-    if (e.key === 'Escape') { e.preventDefault(); $('#kv-modal').classList.remove('show') }
-    return
+/* ========== 核心：DOM挂载后执行（解决正文为空+SSR报错） ========== */
+onMounted(() => {
+  // 加载本地数据
+  load()
+  // 渲染UI
+  renderKeys()
+  renderCfg()
+
+  // 全局键盘捕获（不干扰VitePress原生快捷键）
+  const keydownHandler = (e) => {
+    if ($('#kv-modal').classList.contains('show')) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        $('#kv-modal').classList.remove('show')
+      }
+      return
+    }
+    const isInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable
+    if (!isInput) e.preventDefault()
+    triggerDown(e.code)
   }
-  const isInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable
-  if (!isInput) e.preventDefault()
-  triggerDown(e.code)
-}
 
-const keyupHandler = (e) => {
-  if ($('#kv-modal').classList.contains('show')) return
-  const isInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable
-  if (!isInput) e.preventDefault()
-  triggerUp(e.code)
-}
-
-window.addEventListener('keydown', keydownHandler, true)
-window.addEventListener('keyup', keyupHandler, true)
-
-const blurHandler = () => {
-  physicalPressed.forEach(code => triggerUp(code))
-  physicalPressed.clear()
-  $$('.key.pressed').forEach(el => el.classList.remove('pressed'))
-  for (const id in active) {
-    if (active[id].state === 'growing') { active[id].state = 'rising'; active[id].riseT = 0 }
+  const keyupHandler = (e) => {
+    if ($('#kv-modal').classList.contains('show')) return
+    const isInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable
+    if (!isInput) e.preventDefault()
+    triggerUp(e.code)
   }
-}
-window.addEventListener('blur', blurHandler)
 
-kpsTimer = setInterval(updateInfo, 200)
-window.addEventListener('resize', () => requestAnimationFrame(calcBottom))
+  window.addEventListener('keydown', keydownHandler, true)
+  window.addEventListener('keyup', keyupHandler, true)
 
-/* ========== 初始化 ========== */
-load()
-renderKeys()
-renderCfg()
+  // 失焦清理
+  const blurHandler = () => {
+    physicalPressed.forEach(code => triggerUp(code))
+    physicalPressed.clear()
+    $$('.key.pressed').forEach(el => el.classList.remove('pressed'))
+    for (const id in active) {
+      if (active[id].state === 'growing') {
+        active[id].state = 'rising'
+        active[id].riseT = 0
+      }
+    }
+  }
+  window.addEventListener('blur', blurHandler)
 
-/* ========== 页面卸载清理 ========== */
-onUnmounted(() => {
-  window.removeEventListener('keydown', keydownHandler, true)
-  window.removeEventListener('keyup', keyupHandler, true)
-  window.removeEventListener('blur', blurHandler)
-  window.removeEventListener('resize', calcBottom)
-  clearInterval(kpsTimer)
-  if (rafId) cancelAnimationFrame(rafId)
+  // KPS定时更新
+  kpsTimer = setInterval(updateInfo, 200)
+
+  // 窗口resize适配
+  window.addEventListener('resize', () => requestAnimationFrame(calcBottom))
+
+  // 页面卸载时清理（避免内存泄漏）
+  onUnmounted(() => {
+    window.removeEventListener('keydown', keydownHandler, true)
+    window.removeEventListener('keyup', keyupHandler, true)
+    window.removeEventListener('blur', blurHandler)
+    window.removeEventListener('resize', calcBottom)
+    clearInterval(kpsTimer)
+    if (rafId) cancelAnimationFrame(rafId)
+  })
 })
-
-}
 </script>
 
 # 该工具有什么用处？
