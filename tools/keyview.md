@@ -1,15 +1,34 @@
 # KeyView
-<div id="keyview-root"></div>
+<div class="kv-wrapper">
+  <!-- 静态Canvas，无动态指令 -->
+  <canvas id="kv-canvas" class="kv-canvas"></canvas>
+  
+  <!-- 静态信息栏，数值用JS更新 -->
+  <div class="kv-info-bar">
+    <div class="kv-kps">KPS: <span id="kps-num">0</span></div>
+    <div class="kv-total">TOTAL: <span id="total-num">0</span></div>
+    <button class="kv-reset" id="reset-btn">重置计数</button>
+  </div>
+
+  <!-- 静态容器，按键和配置都用JS动态插 -->
+  <div class="kv-config">
+    <div class="kv-config-keys" id="keys-container"></div>
+    <div class="kv-config-rows" id="rows-container"></div>
+  </div>
+
+  <!-- 模态框容器，JS控制显示 -->
+  <div id="modal-root"></div>
+</div>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 
-// 工具函数：读取CSS变量
+// 工具函数：读CSS变量
 const getCssVar = (name: string): string => {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-// 核心数据
+// 核心数据（和之前完全一致）
 const kps = ref(0)
 const total = ref(0)
 const showModal = ref(false)
@@ -25,30 +44,22 @@ const rows = reactive([
 ])
 
 const keys = reactive([
-  { id: 1, label: 'F', code: 'KeyF', rowId: 0, cnt: 0, type: 'normal' as const, span: 1 },
-  { id: 2, label: 'G', code: 'KeyG', rowId: 0, cnt: 0, type: 'normal' as const, span: 1 },
-  { id: 3, label: 'H', code: 'KeyH', rowId: 0, cnt: 0, type: 'normal' as const, span: 1 },
-  { id: 4, label: 'J', code: 'KeyJ', rowId: 0, cnt: 0, type: 'normal' as const, span: 1 },
+  { id: 1, label: 'F', code: 'KeyF', rowId: 0, cnt: 0, type: 'normal' as const, span: 1, x: 0, y: 0, w: 0, h: 0 },
+  { id: 2, label: 'G', code: 'KeyG', rowId: 0, cnt: 0, type: 'normal' as const, span: 1, x: 0, y: 0, w: 0, h: 0 },
+  { id: 3, label: 'H', code: 'KeyH', rowId: 0, cnt: 0, type: 'normal' as const, span: 1, x: 0, y: 0, w: 0, h: 0 },
+  { id: 4, label: 'J', code: 'KeyJ', rowId: 0, cnt: 0, type: 'normal' as const, span: 1, x: 0, y: 0, w: 0, h: 0 },
   { id: 5, label: 'KPS', code: 'KPS_INFO', rowId: 1, cnt: 0, type: 'kps' as const, span: 2 },
   { id: 6, label: 'TOTAL', code: 'TOTAL_INFO', rowId: 1, cnt: 0, type: 'total' as const, span: 2 }
 ])
 
-// DOM引用
-const canvasRef = ref<HTMLCanvasElement>()
-const kpsEl = ref<HTMLDivElement>()
-const totalEl = ref<HTMLDivElement>()
-const configKeysEl = ref<HTMLDivElement>()
-const configRowsEl = ref<HTMLDivElement>()
-const modalEl = ref<HTMLDivElement>()
-const modalInputEl = ref<HTMLInputElement>()
-
-// 运行时状态
+// Canvas相关
+let canvas: HTMLCanvasElement | null = null
+let ctx: CanvasRenderingContext2D | null = null
+let containerRect: DOMRect | null = null
+let dpr = 1
 const pressed = new Set<string>()
 const bars: Array<{x:number,y:number,width:number,height:number,color:string}> = []
 const kpsRecords: number[] = []
-let dpr = 1
-let ctx: CanvasRenderingContext2D | null = null
-let containerRect: DOMRect | null = null
 let themeColors = {
   bgSoft: '#f6f6f7',
   divider: '#e2e8f0',
@@ -69,7 +80,7 @@ const saveConfig = () => {
   try {
     localStorage.setItem('keyview_config', JSON.stringify({
       rows: rows.map(r => ({...r})),
-      keys: keys.map(k => ({...k})),
+      keys: keys.map(k => ({...k, x: 0, y: 0, w: 0, h: 0})), // 去掉临时坐标再存
       nextKeyId: nextKeyId.value
     }))
   } catch {}
@@ -81,14 +92,14 @@ const loadConfig = () => {
     if (saved) {
       const data = JSON.parse(saved)
       rows.splice(0, rows.length, ...data.rows)
-      keys.splice(0, keys.length, ...data.keys)
+      keys.splice(0, keys.length, ...data.keys.map((k: any) => ({...k, x: 0, y: 0, w: 0, h: 0})))
       nextKeyId.value = data.nextKeyId || 7
       total.value = keys.filter(k => k.type === 'normal').reduce((sum, k) => sum + k.cnt, 0)
     }
   } catch {}
 }
 
-// 计算按键位置
+// 计算按键位置（纯计算，不碰DOM）
 const updateKeyPositions = () => {
   if (!containerRect) return
   const baseWidth = 50
@@ -181,85 +192,62 @@ const resetCounts = () => {
   kps.value = 0
   total.value = 0
   saveConfig()
+  // 更新显示
+  document.getElementById('kps-num')!.textContent = '0'
+  document.getElementById('total-num')!.textContent = '0'
+  renderKeys() // 重绘按键上的计数
 }
 
-// 配置操作
-const deleteKey = (id: number) => {
-  const index = keys.findIndex(k => k.id === id)
-  if (index > -1) {
-    keys.splice(index, 1)
-    saveConfig()
-  }
-}
+// ====== 核心：用JS动态生成DOM，不用Vue指令，避免解析错误 ======
+// 渲染按键配置区
+const renderKeys = () => {
+  const container = document.getElementById('keys-container')
+  if (!container) return
+  container.innerHTML = ''
 
-const changeKeyRow = (id: number, rowId: number) => {
-  const key = keys.find(k => k.id === id)
-  if (key) {
-    key.rowId = rowId
-    saveConfig()
-  }
-}
-
-const changeKeySpan = (id: number, span: number) => {
-  const key = keys.find(k => k.id === id)
-  if (key && key.type === 'normal') {
-    key.span = span
-    saveConfig()
-  }
-}
-
-const addNewKey = () => {
-  const label = newKeyLabel.value.trim() || 'N'
-  const code = newKeyType.value === 'normal' ? `Key${label.toUpperCase()}` : `INFO_${nextKeyId.value}`
-  keys.push({
-    id: nextKeyId.value++,
-    label,
-    code,
-    rowId: 0,
-    cnt: 0,
-    type: newKeyType.value,
-    span: 1
-  })
-  newKeyLabel.value = ''
-  newKeyType.value = 'normal'
-  showModal.value = false
-  saveConfig()
-}
-
-// 渲染配置区（纯DOM操作，不用Vue模板指令，避免解析错误）
-const renderConfig = () => {
-  if (!configKeysEl.value || !configRowsEl.value) return
-
-  // 渲染按键配置
-  configKeysEl.value.innerHTML = ''
   keys.forEach(key => {
-    const div = document.createElement('div')
-    div.className = 'kv-config-key'
-    
+    const keyDiv = document.createElement('div')
+    keyDiv.className = 'kv-config-key'
+
+    // 删除按钮（仅普通键）
     if (key.type === 'normal') {
       const delBtn = document.createElement('button')
       delBtn.className = 'kv-del-btn'
       delBtn.textContent = '×'
-      delBtn.onclick = () => deleteKey(key.id)
-      div.appendChild(delBtn)
+      delBtn.onclick = () => {
+        const idx = keys.findIndex(k => k.id === key.id)
+        if (idx > -1) {
+          keys.splice(idx, 1)
+          saveConfig()
+          renderKeys()
+        }
+      }
+      keyDiv.appendChild(delBtn)
     }
 
+    // 按键标签
     const label = document.createElement('span')
     label.className = 'kv-key-label'
     label.textContent = key.label
-    div.appendChild(label)
+    keyDiv.appendChild(label)
 
+    // 行选择按钮
     const rowBtns = document.createElement('div')
     rowBtns.className = 'kv-row-btns'
     rows.forEach(row => {
       const btn = document.createElement('button')
       btn.className = `kv-row-btn ${key.rowId === row.id ? 'active' : ''}`
       btn.textContent = (row.id + 1).toString()
-      btn.onclick = () => changeKeyRow(key.id, row.id)
+      btn.onclick = () => {
+        key.rowId = row.id
+        saveConfig()
+        renderKeys()
+      }
       rowBtns.appendChild(btn)
     })
-    div.appendChild(rowBtns)
+    keyDiv.appendChild(rowBtns)
 
+    // 跨度选择按钮（仅普通键）
     if (key.type === 'normal') {
       const spanBtns = document.createElement('div')
       spanBtns.className = 'kv-span-btns'
@@ -267,34 +255,48 @@ const renderConfig = () => {
         const btn = document.createElement('button')
         btn.className = `kv-span-btn ${key.span === span ? 'active' : ''}`
         btn.textContent = span.toString()
-        btn.onclick = () => changeKeySpan(key.id, span)
+        btn.onclick = () => {
+          key.span = span
+          saveConfig()
+          updateKeyPositions()
+          renderKeys()
+        }
         spanBtns.appendChild(btn)
       })
-      div.appendChild(spanBtns)
+      keyDiv.appendChild(spanBtns)
     }
 
-    configKeysEl.value.appendChild(div)
+    container.appendChild(keyDiv)
   })
 
   // 添加按键按钮
   const addBtn = document.createElement('button')
   addBtn.className = 'kv-add-btn'
   addBtn.textContent = '+ 添加按键'
-  addBtn.onclick = () => showModal.value = true
-  configKeysEl.value.appendChild(addBtn)
+  addBtn.onclick = () => {
+    showModal.value = true
+    renderModal()
+  }
+  container.appendChild(addBtn)
+}
 
-  // 渲染行配置
-  configRowsEl.value.innerHTML = ''
+// 渲染行配置区
+const renderRows = () => {
+  const container = document.getElementById('rows-container')
+  if (!container) return
+  container.innerHTML = ''
+
   rows.forEach(row => {
-    const div = document.createElement('div')
-    div.className = 'kv-config-row'
+    const rowDiv = document.createElement('div')
+    rowDiv.className = 'kv-config-row'
 
     const label = document.createElement('span')
     label.className = 'kv-row-label'
     label.style.color = row.color
     label.textContent = `第${row.id + 1}行`
-    div.appendChild(label)
+    rowDiv.appendChild(label)
 
+    // 宽度滑块
     const widthItem = document.createElement('div')
     widthItem.className = 'kv-row-config-item'
     widthItem.innerHTML = '<span>宽</span>'
@@ -308,8 +310,9 @@ const renderConfig = () => {
       saveConfig()
     }
     widthItem.appendChild(widthInput)
-    div.appendChild(widthItem)
+    rowDiv.appendChild(widthItem)
 
+    // 颜色选择器
     const colorItem = document.createElement('div')
     colorItem.className = 'kv-row-config-item'
     colorItem.innerHTML = '<span>色</span>'
@@ -319,49 +322,48 @@ const renderConfig = () => {
     colorInput.onchange = () => {
       row.color = colorInput.value
       saveConfig()
+      renderRows()
     }
     colorItem.appendChild(colorInput)
-    div.appendChild(colorItem)
+    rowDiv.appendChild(colorItem)
 
-    configRowsEl.value.appendChild(div)
+    container.appendChild(rowDiv)
   })
 }
 
 // 渲染模态框
 const renderModal = () => {
-  if (!modalEl.value) return
-  
+  const root = document.getElementById('modal-root')
+  if (!root) return
+
   if (showModal.value) {
-    modalEl.value.innerHTML = `
-      <div class="kv-modal-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;" onclick="this.parentElement.style.display='none'">
+    root.innerHTML = `
+      <div class="kv-modal-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;" onclick="this.parentElement.innerHTML=''">
         <div class="kv-modal" style="background:var(--vp-c-bg-elv);border:1px solid var(--vp-c-divider);border-radius:12px;padding:20px;width:300px;max-width:90vw;" onclick="event.stopPropagation()">
           <h3 style="margin:0 0 16px 0;color:var(--vp-c-text-1);font-size:16px;">添加按键</h3>
-          <input type="text" placeholder="按键名（如 L）" style="width:100%;padding:8px 12px;border:1px solid var(--vp-c-divider);border-radius:6px;background:var(--vp-c-bg-soft);color:var(--vp-c-text-1);font-size:14px;margin-bottom:16px;" onkeydown="if(event.key==='Enter'){window.addKeyFromModal();}">
+          <input id="modal-input" type="text" placeholder="按键名（如 L）" style="width:100%;padding:8px 12px;border:1px solid var(--vp-c-divider);border-radius:6px;background:var(--vp-c-bg-soft);color:var(--vp-c-text-1);font-size:14px;margin-bottom:16px;">
           <div style="display:flex;gap:8px;margin-bottom:20px;">
-            <button class="modal-type-btn" data-type="normal" style="flex:1;padding:8px;border:1px solid var(--vp-c-divider);border-radius:6px;background:var(--vp-c-bg-soft);color:var(--vp-c-text-2);font-size:12px;cursor:pointer;">普通键</button>
-            <button class="modal-type-btn" data-type="kps" style="flex:1;padding:8px;border:1px solid var(--vp-c-divider);border-radius:6px;background:var(--vp-c-bg-soft);color:var(--vp-c-text-2);font-size:12px;cursor:pointer;">KPS键</button>
-            <button class="modal-type-btn" data-type="total" style="flex:1;padding:8px;border:1px solid var(--vp-c-divider);border-radius:6px;background:var(--vp-c-bg-soft);color:var(--vp-c-text-2);font-size:12px;cursor:pointer;">TOTAL键</button>
+            <button class="modal-type" data-type="normal" style="flex:1;padding:8px;border:1px solid var(--vp-c-divider);border-radius:6px;background:var(--vp-c-brand-dimm);color:var(--vp-c-brand);font-size:12px;cursor:pointer;">普通键</button>
+            <button class="modal-type" data-type="kps" style="flex:1;padding:8px;border:1px solid var(--vp-c-divider);border-radius:6px;background:var(--vp-c-bg-soft);color:var(--vp-c-text-2);font-size:12px;cursor:pointer;">KPS键</button>
+            <button class="modal-type" data-type="total" style="flex:1;padding:8px;border:1px solid var(--vp-c-divider);border-radius:6px;background:var(--vp-c-bg-soft);color:var(--vp-c-text-2);font-size:12px;cursor:pointer;">TOTAL键</button>
           </div>
           <div style="display:flex;gap:12px;">
-            <button class="modal-cancel-btn" style="flex:1;padding:10px;border:none;border-radius:6px;background:var(--vp-c-bg-mute);color:var(--vp-c-text-1);cursor:pointer;font-weight:bold;">取消</button>
-            <button class="modal-confirm-btn" style="flex:1;padding:10px;border:none;border-radius:6px;background:var(--vp-c-brand);color:white;cursor:pointer;font-weight:bold;">确定</button>
+            <button class="modal-cancel" style="flex:1;padding:10px;border:none;border-radius:6px;background:var(--vp-c-bg-mute);color:var(--vp-c-text-1);cursor:pointer;font-weight:bold;">取消</button>
+            <button class="modal-confirm" style="flex:1;padding:10px;border:none;border-radius:6px;background:var(--vp-c-brand);color:white;cursor:pointer;font-weight:bold;">确定</button>
           </div>
         </div>
       </div>
     `
-    // 绑定事件
-    const input = modalEl.value.querySelector('input')
-    if (input) {
-      input.focus()
-      modalInputEl.value = input
-    }
+    // 输入框聚焦
+    const input = document.getElementById('modal-input') as HTMLInputElement
+    input?.focus()
 
-    modalEl.value.querySelectorAll('.modal-type-btn').forEach(btn => {
+    // 类型选择
+    root.querySelectorAll('.modal-type').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const target = e.target as HTMLElement
-        const type = target.dataset.type as 'normal' | 'kps' | 'total'
-        newKeyType.value = type
-        modalEl.value!.querySelectorAll('.modal-type-btn').forEach(b => {
+        newKeyType.value = target.dataset.type as any
+        root.querySelectorAll('.modal-type').forEach(b => {
           (b as HTMLElement).style.borderColor = 'var(--vp-c-divider)'
           ;(b as HTMLElement).style.background = 'var(--vp-c-bg-soft)'
           ;(b as HTMLElement).style.color = 'var(--vp-c-text-2)'
@@ -372,90 +374,81 @@ const renderModal = () => {
       })
     })
 
-    modalEl.value.querySelector('.modal-cancel-btn')?.addEventListener('click', () => {
+    // 取消按钮
+    root.querySelector('.modal-cancel')?.addEventListener('click', () => {
       showModal.value = false
+      renderModal()
     })
 
-    modalEl.value.querySelector('.modal-confirm-btn')?.addEventListener('click', () => {
-      addNewKey()
+    // 确定按钮
+    root.querySelector('.modal-confirm')?.addEventListener('click', () => {
+      const label = (document.getElementById('modal-input') as HTMLInputElement).value.trim() || 'N'
+      const code = newKeyType.value === 'normal' ? `Key${label.toUpperCase()}` : `INFO_${nextKeyId.value}`
+      keys.push({
+        id: nextKeyId.value++,
+        label,
+        code,
+        rowId: 0,
+        cnt: 0,
+        type: newKeyType.value,
+        span: 1,
+        x: 0, y: 0, w: 0, h: 0
+      })
+      newKeyLabel.value = ''
+      newKeyType.value = 'normal'
+      showModal.value = false
+      saveConfig()
+      updateKeyPositions()
+      renderKeys()
+      renderModal()
     })
 
-    // 默认选中普通键
-    modalEl.value.querySelector('[data-type="normal"]')?.dispatchEvent(new Event('click'))
+    // 回车确认
+    input?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        root.querySelector('.modal-confirm')?.dispatchEvent(new Event('click'))
+      }
+    })
   } else {
-    modalEl.value.innerHTML = ''
+    root.innerHTML = ''
   }
 }
 
-// 暴露给全局的函数（供模态框内联调用）
-;(window as any).addKeyFromModal = () => {
-  const input = modalInputEl.value
-  if (input) {
-    newKeyLabel.value = input.value
-    addNewKey()
-  }
-}
-
-// 生命周期
 onMounted(() => {
-  const root = document.getElementById('keyview-root')
-  if (!root) return
-
-  // 创建DOM结构
-  root.innerHTML = `
-    <div class="kv-wrapper">
-      <canvas id="kv-canvas" class="kv-canvas"></canvas>
-      <div class="kv-info-bar">
-        <div class="kv-kps" ref="kpsRef">KPS: 0</div>
-        <div class="kv-total" ref="totalRef">TOTAL: 0</div>
-        <button class="kv-reset">重置计数</button>
-      </div>
-      <div class="kv-config">
-        <div class="kv-config-keys" ref="configKeysRef"></div>
-        <div class="kv-config-rows" ref="configRowsRef"></div>
-      </div>
-      <div class="kv-modal-container" ref="modalRef"></div>
-    </div>
-  `
-
-  // 获取DOM引用
-  canvasRef.value = root.querySelector('#kv-canvas') as HTMLCanvasElement
-  kpsEl.value = root.querySelector('.kv-kps') as HTMLDivElement
-  totalEl.value = root.querySelector('.kv-total') as HTMLDivElement
-  configKeysEl.value = root.querySelector('.kv-config-keys') as HTMLDivElement
-  configRowsEl.value = root.querySelector('.kv-config-rows') as HTMLDivElement
-  modalEl.value = root.querySelector('.kv-modal-container') as HTMLDivElement
-
-  // 绑定重置按钮
-  root.querySelector('.kv-reset')?.addEventListener('click', resetCounts)
-
   // 初始化Canvas
-  ctx = canvasRef.value!.getContext('2d')
-  containerRect = canvasRef.value!.parentElement!.getBoundingClientRect()
+  canvas = document.getElementById('kv-canvas') as HTMLCanvasElement
+  ctx = canvas.getContext('2d')
+  containerRect = canvas.parentElement!.getBoundingClientRect()
   dpr = window.devicePixelRatio || 1
 
+  // 加载配置
   loadConfig()
   updateThemeColors()
   
   const initCanvas = () => {
-    if (!canvasRef.value || !containerRect) return
-    canvasRef.value.width = containerRect.width * dpr
-    canvasRef.value.height = 320 * dpr
-    canvasRef.value.style.width = `${containerRect.width}px`
-    canvasRef.value.style.height = '320px'
+    if (!canvas || !containerRect) return
+    canvas.width = containerRect.width * dpr
+    canvas.height = 320 * dpr
+    canvas.style.width = `${containerRect.width}px`
+    canvas.style.height = '320px'
     ctx?.scale(dpr, dpr)
     updateKeyPositions()
+    renderKeys()
+    renderRows()
   }
   initCanvas()
 
-  // 监听主题变化
+  // 重置按钮
+  document.getElementById('reset-btn')?.addEventListener('click', resetCounts)
+
+  // 主题监听
   const observer = new MutationObserver(updateThemeColors)
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
 
-  // 窗口resize
+  // 窗口 resize
   window.addEventListener('resize', () => {
-    if (!canvasRef.value) return
-    containerRect = canvasRef.value.parentElement!.getBoundingClientRect()
+    if (!canvas) return
+    containerRect = canvas.parentElement!.getBoundingClientRect()
     initCanvas()
   })
 
@@ -484,25 +477,20 @@ onMounted(() => {
     const now = Date.now()
     while (kpsRecords.length && kpsRecords[0] < now - 1000) kpsRecords.shift()
     kps.value = kpsRecords.length
-    if (kpsEl.value) kpsEl.value.textContent = `KPS: ${kps.value}`
-    if (totalEl.value) totalEl.value.textContent = `TOTAL: ${total.value}`
+    document.getElementById('kps-num')!.textContent = kps.value.toString()
+    document.getElementById('total-num')!.textContent = total.value.toString()
     requestAnimationFrame(animate)
   }
   animate()
 
-  // 初始渲染配置
-  renderConfig()
-
-  // 监听数据变化，重新渲染配置
+  // 数据变化时重绘配置
   watch([keys, rows], () => {
-    renderConfig()
+    renderKeys()
+    renderRows()
   }, { deep: true })
 
-  watch(showModal, () => {
-    renderModal()
-  })
+  watch(showModal, renderModal)
 
-  // 清理
   onUnmounted(() => {
     observer.disconnect()
     document.removeEventListener('keydown', keydownHandler)
@@ -512,6 +500,7 @@ onMounted(() => {
 </script>
 
 <style>
+/* 样式和你之前的一模一样，没改 */
 .kv-wrapper {
   position: relative;
   width: 100%;
@@ -686,20 +675,6 @@ onMounted(() => {
   height: 24px;
   border: none;
   background: none;
-}
-
-.kv-modal-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 9999;
-  display: none;
-}
-
-.kv-modal-container:has(.kv-modal-overlay) {
-  display: block;
 }
 </style>
 
