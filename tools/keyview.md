@@ -1,6 +1,7 @@
 # KeyView
-
-<script setup lang="ts">
+<!-- 【核心修复】用VitePress官方的ClientOnly包裹，SSR阶段完全跳过渲染，从根上避免DOM报错 -->
+<ClientOnly>
+  <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 
 // 【工具函数：读取CSS变量】
@@ -48,7 +49,6 @@ let themeColors = {
   text1: '#1a202c',
   text3: '#64748b'
 }
-let isMounted = false // 标记DOM是否就绪
 
 // 【工具方法层】
 const updateThemeColors = () => {
@@ -82,15 +82,15 @@ const loadConfig = () => {
   } catch {}
 }
 
-// 计算按键位置（严格判空，避免时序报错）
+// 计算按键位置
 const updateKeyPositions = () => {
-  if (!isMounted || !containerRect) return // 只有DOM就绪后才执行
+  if (!containerRect) return
   const baseWidth = 50
   const gap = 12
   const normalKeys = keys.filter(k => k.type === 'normal')
   const totalWidth = normalKeys.reduce((sum, k) => sum + baseWidth + (k.span - 1) * 56 + gap, 0) - gap
   let startX = (containerRect.width - totalWidth) / 2
-  const keyY = 520 - 200 - 25 - 50
+  const keyY = 320 - 25 - 50 // Canvas高度320px，减去自身高度和边距
   normalKeys.forEach(key => {
     key.x = startX
     key.y = keyY
@@ -135,7 +135,7 @@ const drawBars = () => {
     const bar = bars[i]
     bar.y -= 2.5
     ctx.fillStyle = bar.color
-    ctx.fillRect(bar.x, 520 - 200 - bar.y - bar.height, bar.width, bar.height)
+    ctx.fillRect(bar.x, 320 - bar.y - bar.height, bar.width, bar.height)
     if (bar.y < -bar.height) bars.splice(i, 1)
   }
 }
@@ -222,7 +222,6 @@ const addNewKey = () => {
 
 // 【生命周期层】
 onMounted(() => {
-  isMounted = true // DOM就绪标记
   if (!canvasRef.value) return
   ctx = canvasRef.value.getContext('2d')
   containerRect = canvasRef.value.parentElement!.getBoundingClientRect()
@@ -234,11 +233,11 @@ onMounted(() => {
   const initCanvas = () => {
     if (!canvasRef.value || !containerRect) return
     canvasRef.value.width = containerRect.width * dpr
-    canvasRef.value.height = 520 * dpr
+    canvasRef.value.height = 320 * dpr
     canvasRef.value.style.width = `${containerRect.width}px`
-    canvasRef.value.style.height = '320px' // 显式设置高度，避免calc计算问题
+    canvasRef.value.style.height = '320px'
     ctx?.scale(dpr, dpr)
-    updateKeyPositions() // 初始化后计算位置
+    updateKeyPositions()
   }
   initCanvas()
 
@@ -283,14 +282,13 @@ onMounted(() => {
 
   // 清理
   onUnmounted(() => {
-    isMounted = false
     observer.disconnect()
     document.removeEventListener('keydown', keydownHandler)
     document.removeEventListener('keyup', keyupHandler)
   })
 })
 
-// 【关键修复】watch延迟到DOM更新后执行，避免时序报错
+// 延迟到DOM更新后执行，避免时序问题
 watch(keys, updateKeyPositions, { deep: true, flush: 'post' })
 </script>
 
@@ -411,7 +409,7 @@ watch(keys, updateKeyPositions, { deep: true, flush: 'post' })
 
 .kv-canvas {
   width: 100%;
-  height: 320px; /* 显式高度，避免calc问题 */
+  height: 320px;
   display: block;
 }
 
@@ -664,6 +662,7 @@ watch(keys, updateKeyPositions, { deep: true, flush: 'post' })
   color: white;
 }
 </style>
+</ClientOnly>
 
 ## 该工具有什么用处？
 可用于显示游戏中输入的按键，如果您发布视频的话，这实际上可以很方便地给观众查看手法。
