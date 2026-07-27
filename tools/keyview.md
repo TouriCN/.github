@@ -1,10 +1,14 @@
 # KeyView
 
-<!-- 内联Vue组件：VitePress原生支持的架构，不用拆文件，逻辑自洽 -->
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 
-// 【架构分层：状态层】所有响应式数据集中管理，不用全局变量
+// 【工具函数：读取CSS变量，解决canvas不兼容CSS变量的问题】
+const getCssVar = (name: string): string => {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
+// 【状态层】
 const canvasRef = ref<HTMLCanvasElement>()
 const kps = ref(0)
 const keys = reactive([
@@ -19,8 +23,22 @@ const kpsRecords: number[] = []
 let dpr = 1
 let ctx: CanvasRenderingContext2D | null = null
 let containerRect: DOMRect | null = null
+// 缓存主题相关颜色，避免每次绘制都读DOM
+let themeColors = {
+  bgSoft: '',
+  divider: '',
+  text1: '',
+  text3: ''
+}
 
-// 【架构分层：工具方法层】纯函数，无副作用，方便维护
+// 【工具方法层】
+const updateThemeColors = () => {
+  themeColors.bgSoft = getCssVar('--vp-c-bg-soft') || '#f6f6f7'
+  themeColors.divider = getCssVar('--vp-c-divider') || '#e2e8f0'
+  themeColors.text1 = getCssVar('--vp-c-text-1') || '#1a202c'
+  themeColors.text3 = getCssVar('--vp-c-text-3') || '#64748b'
+}
+
 const updateKeyPositions = () => {
   if (!containerRect) return
   const keyW = 50
@@ -37,26 +55,30 @@ const updateKeyPositions = () => {
 
 const drawKeys = () => {
   if (!ctx || !containerRect) return
-  const isDark = document.documentElement.classList.contains('dark')
   keys.forEach(key => {
-    ctx.fillStyle = isDark ? 'var(--vp-c-bg-soft)' : '#f6f6f7'
+    // 按键底色
+    ctx.fillStyle = themeColors.bgSoft
     ctx.fillRect(key.x, key.y, key.w, key.h)
+    // 边框
     ctx.lineWidth = 2
-    ctx.strokeStyle = pressed.has(key.code) ? key.color : 'var(--vp-c-divider)'
+    ctx.strokeStyle = pressed.has(key.code) ? key.color : themeColors.divider
     ctx.strokeRect(key.x, key.y, key.w, key.h)
+    // 按下缩放反馈
     if (pressed.has(key.code)) {
       ctx.save()
       ctx.translate(key.x + key.w/2, key.y + key.h/2)
       ctx.scale(0.96, 0.96)
       ctx.translate(-(key.x + key.w/2), -(key.y + key.h/2))
     }
-    ctx.fillStyle = 'var(--vp-c-text-1)'
+    // 按键文字
+    ctx.fillStyle = themeColors.text1
     ctx.font = 'bold 15px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(key.label, key.x + key.w/2, key.y + key.h/2 - 6)
+    // 计数文字
     ctx.font = '10px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto'
-    ctx.fillStyle = 'var(--vp-c-text-3)'
+    ctx.fillStyle = themeColors.text3
     ctx.fillText(key.cnt, key.x + key.w/2, key.y + key.h/2 + 10)
     if (pressed.has(key.code)) ctx.restore()
   })
@@ -73,7 +95,7 @@ const drawBars = () => {
   }
 }
 
-// 【架构分层：业务逻辑层】事件处理、KPS计算等核心逻辑
+// 【业务逻辑层】
 const handleDown = (code: string) => {
   if (pressed.has(code)) return
   pressed.add(code)
@@ -93,14 +115,15 @@ const resetCounts = () => {
   kps.value = 0
 }
 
-// 【架构分层：生命周期层】Vue原生钩子，天然只在客户端执行，不用手动写SSR判断
+// 【生命周期层】
 onMounted(() => {
   if (!canvasRef.value) return
   ctx = canvasRef.value.getContext('2d')
   containerRect = canvasRef.value.parentElement!.getBoundingClientRect()
   dpr = window.devicePixelRatio || 1
 
-  // 初始化画布
+  // 初始化主题颜色和画布
+  updateThemeColors()
   const initCanvas = () => {
     if (!canvasRef.value || !containerRect) return
     canvasRef.value.width = containerRect.width * dpr
@@ -111,9 +134,19 @@ onMounted(() => {
     updateKeyPositions()
   }
   initCanvas()
-  window.addEventListener('resize', initCanvas)
 
-  // 键盘事件绑定
+  // 监听主题变化，更新颜色缓存
+  const observer = new MutationObserver(() => updateThemeColors())
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+
+  // 窗口 resize 适配
+  window.addEventListener('resize', () => {
+    if (!canvasRef.value) return
+    containerRect = canvasRef.value.parentElement!.getBoundingClientRect()
+    initCanvas()
+  })
+
+  // 键盘事件
   const keydownHandler = (e: KeyboardEvent) => {
     if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '')) return
     if (keys.some(k => k.code === e.code)) handleDown(e.code)
@@ -140,15 +173,15 @@ onMounted(() => {
   }
   animate()
 
-  // 清理事件
+  // 清理
   onUnmounted(() => {
+    observer.disconnect()
     document.removeEventListener('keydown', keydownHandler)
     document.removeEventListener('keyup', keyupHandler)
   })
 })
 </script>
 
-<!-- 【架构分层：视图层】模板和逻辑完全解耦，没有内联JS -->
 <template>
   <div class="kv-wrapper">
     <canvas ref="canvasRef" class="kv-canvas"></canvas>
@@ -157,7 +190,6 @@ onMounted(() => {
   </div>
 </template>
 
-<!-- 【架构分层：样式层】样式和逻辑解耦，用VitePress主题变量 -->
 <style>
 .kv-wrapper {
   position: relative;
@@ -170,6 +202,8 @@ onMounted(() => {
   border: 1px solid var(--vp-c-divider);
   border-radius: 8px;
   display: block;
+  /* 显式设置canvas默认背景，避免透明导致的显示异常 */
+  background: var(--vp-c-bg);
 }
 .kv-reset {
   position: absolute;
