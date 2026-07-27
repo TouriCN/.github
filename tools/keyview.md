@@ -43,11 +43,12 @@ let dpr = 1
 let ctx: CanvasRenderingContext2D | null = null
 let containerRect: DOMRect | null = null
 let themeColors = {
-  bgSoft: '',
-  divider: '',
-  text1: '',
-  text3: ''
+  bgSoft: '#f6f6f7',
+  divider: '#e2e8f0',
+  text1: '#1a202c',
+  text3: '#64748b'
 }
+let isMounted = false // 标记DOM是否就绪
 
 // 【工具方法层】
 const updateThemeColors = () => {
@@ -81,16 +82,15 @@ const loadConfig = () => {
   } catch {}
 }
 
-// 计算按键位置（按跨度自动分配宽度）
+// 计算按键位置（严格判空，避免时序报错）
 const updateKeyPositions = () => {
-  if (!containerRect) return
+  if (!isMounted || !containerRect) return // 只有DOM就绪后才执行
   const baseWidth = 50
   const gap = 12
-  // 只计算普通键的位置，信息键不显示在canvas上
   const normalKeys = keys.filter(k => k.type === 'normal')
   const totalWidth = normalKeys.reduce((sum, k) => sum + baseWidth + (k.span - 1) * 56 + gap, 0) - gap
   let startX = (containerRect.width - totalWidth) / 2
-  const keyY = 520 - 200 - 25 - 50 // 距离底部200px（配置区高度）+ 按键高度一半
+  const keyY = 520 - 200 - 25 - 50
   normalKeys.forEach(key => {
     key.x = startX
     key.y = keyY
@@ -105,28 +105,23 @@ const drawKeys = () => {
   if (!ctx || !containerRect) return
   const normalKeys = keys.filter(k => k.type === 'normal')
   normalKeys.forEach(key => {
-    // 按键底色
     ctx.fillStyle = themeColors.bgSoft
     ctx.fillRect(key.x, key.y, key.w, key.h)
-    // 边框
     ctx.lineWidth = 2
     const row = rows.find(r => r.id === key.rowId)!
     ctx.strokeStyle = pressed.has(key.code) ? row.color : themeColors.divider
     ctx.strokeRect(key.x, key.y, key.w, key.h)
-    // 按下缩放反馈
     if (pressed.has(key.code)) {
       ctx.save()
       ctx.translate(key.x + key.w/2, key.y + key.h/2)
       ctx.scale(0.96, 0.96)
       ctx.translate(-(key.x + key.w/2), -(key.y + key.h/2))
     }
-    // 按键文字
     ctx.fillStyle = themeColors.text1
     ctx.font = 'bold 15px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(key.label, key.x + key.w/2, key.y + key.h/2 - 6)
-    // 计数文字
     ctx.font = '10px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto'
     ctx.fillStyle = themeColors.text3
     ctx.fillText(key.cnt.toString(), key.x + key.w/2, key.y + key.h/2 + 10)
@@ -156,7 +151,6 @@ const handleDown = (code: string) => {
     if (key.type === 'normal') {
       key.cnt++
       total.value++
-      // 生成上升条（用所属行的属性）
       const row = rows.find(r => r.id === key.rowId)!
       const keyEl = keys.find(k => k.code === code)!
       bars.push({
@@ -228,6 +222,7 @@ const addNewKey = () => {
 
 // 【生命周期层】
 onMounted(() => {
+  isMounted = true // DOM就绪标记
   if (!canvasRef.value) return
   ctx = canvasRef.value.getContext('2d')
   containerRect = canvasRef.value.parentElement!.getBoundingClientRect()
@@ -241,9 +236,9 @@ onMounted(() => {
     canvasRef.value.width = containerRect.width * dpr
     canvasRef.value.height = 520 * dpr
     canvasRef.value.style.width = `${containerRect.width}px`
-    canvasRef.value.style.height = '520px'
+    canvasRef.value.style.height = '320px' // 显式设置高度，避免calc计算问题
     ctx?.scale(dpr, dpr)
-    updateKeyPositions()
+    updateKeyPositions() // 初始化后计算位置
   }
   initCanvas()
 
@@ -276,10 +271,9 @@ onMounted(() => {
   // 动画循环
   const animate = () => {
     if (!ctx || !containerRect) return
-    ctx.clearRect(0, 0, containerRect.width, 520)
+    ctx.clearRect(0, 0, containerRect.width, 320)
     drawBars()
     drawKeys()
-    // 更新KPS
     const now = Date.now()
     while (kpsRecords.length && kpsRecords[0] < now - 1000) kpsRecords.shift()
     kps.value = kpsRecords.length
@@ -289,14 +283,15 @@ onMounted(() => {
 
   // 清理
   onUnmounted(() => {
+    isMounted = false
     observer.disconnect()
     document.removeEventListener('keydown', keydownHandler)
     document.removeEventListener('keyup', keyupHandler)
   })
 })
 
-// 监听按键变化，更新位置
-watch(keys, updateKeyPositions, { deep: true })
+// 【关键修复】watch延迟到DOM更新后执行，避免时序报错
+watch(keys, updateKeyPositions, { deep: true, flush: 'post' })
 </script>
 
 <template>
@@ -416,7 +411,7 @@ watch(keys, updateKeyPositions, { deep: true })
 
 .kv-canvas {
   width: 100%;
-  height: calc(520px - 200px); /* 减去配置区高度 */
+  height: 320px; /* 显式高度，避免calc问题 */
   display: block;
 }
 
