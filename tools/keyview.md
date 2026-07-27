@@ -1,29 +1,47 @@
 # KeyView
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 
-// 【工具函数：读取CSS变量，解决canvas不兼容CSS变量的问题】
+// 【工具函数：读取CSS变量】
 const getCssVar = (name: string): string => {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-// 【状态层】
+// 【状态层：核心数据】
 const canvasRef = ref<HTMLCanvasElement>()
 const kps = ref(0)
-const keys = reactive([
-  { code: 'KeyF', label: 'F', cnt: 0, color: '#ff3366', x: 0, y: 0, w: 50, h: 50 },
-  { code: 'KeyG', label: 'G', cnt: 0, color: '#ff9f43', x: 0, y: 0, w: 50, h: 50 },
-  { code: 'KeyH', label: 'H', cnt: 0, color: '#ffcc00', x: 0, y: 0, w: 50, h: 50 },
-  { code: 'KeyJ', label: 'J', cnt: 0, color: '#00ff88', x: 0, y: 0, w: 50, h: 50 }
+const total = ref(0)
+const showModal = ref(false)
+const newKeyLabel = ref('')
+const newKeyType = ref<'normal' | 'kps' | 'total'>('normal')
+const nextKeyId = ref(7)
+
+// 行配置（对应上升条属性）
+const rows = reactive([
+  { id: 0, width: 52, color: '#ff3366' },
+  { id: 1, width: 40, color: '#ff9f43' },
+  { id: 2, width: 28, color: '#ffcc00' },
+  { id: 3, width: 16, color: '#00ff88' }
 ])
+
+// 按键配置
+const keys = reactive([
+  { id: 1, label: 'F', code: 'KeyF', rowId: 0, cnt: 0, type: 'normal' as const, span: 1 },
+  { id: 2, label: 'G', code: 'KeyG', rowId: 0, cnt: 0, type: 'normal' as const, span: 1 },
+  { id: 3, label: 'H', code: 'KeyH', rowId: 0, cnt: 0, type: 'normal' as const, span: 1 },
+  { id: 4, label: 'J', code: 'KeyJ', rowId: 0, cnt: 0, type: 'normal' as const, span: 1 },
+  { id: 5, label: 'KPS', code: 'KPS_INFO', rowId: 1, cnt: 0, type: 'kps' as const, span: 2 },
+  { id: 6, label: 'TOTAL', code: 'TOTAL_INFO', rowId: 1, cnt: 0, type: 'total' as const, span: 2 }
+])
+
+// 运行时状态
 const pressed = new Set<string>()
 const bars: Array<{x:number,y:number,width:number,height:number,color:string}> = []
 const kpsRecords: number[] = []
 let dpr = 1
 let ctx: CanvasRenderingContext2D | null = null
 let containerRect: DOMRect | null = null
-// 缓存主题相关颜色，避免每次绘制都读DOM
 let themeColors = {
   bgSoft: '',
   divider: '',
@@ -39,29 +57,61 @@ const updateThemeColors = () => {
   themeColors.text3 = getCssVar('--vp-c-text-3') || '#64748b'
 }
 
+// 本地存储
+const saveConfig = () => {
+  try {
+    localStorage.setItem('keyview_config', JSON.stringify({
+      rows: rows.map(r => ({...r})),
+      keys: keys.map(k => ({...k})),
+      nextKeyId: nextKeyId.value
+    }))
+  } catch {}
+}
+
+const loadConfig = () => {
+  try {
+    const saved = localStorage.getItem('keyview_config')
+    if (saved) {
+      const data = JSON.parse(saved)
+      rows.splice(0, rows.length, ...data.rows)
+      keys.splice(0, keys.length, ...data.keys)
+      nextKeyId.value = data.nextKeyId || 7
+      total.value = keys.filter(k => k.type === 'normal').reduce((sum, k) => sum + k.cnt, 0)
+    }
+  } catch {}
+}
+
+// 计算按键位置（按跨度自动分配宽度）
 const updateKeyPositions = () => {
   if (!containerRect) return
-  const keyW = 50
+  const baseWidth = 50
   const gap = 12
-  const totalW = keys.length * keyW + (keys.length - 1) * gap
-  let startX = (containerRect.width - totalW) / 2
-  const keyY = 520 - 200 - 25 - keyW
-  keys.forEach(key => {
+  // 只计算普通键的位置，信息键不显示在canvas上
+  const normalKeys = keys.filter(k => k.type === 'normal')
+  const totalWidth = normalKeys.reduce((sum, k) => sum + baseWidth + (k.span - 1) * 56 + gap, 0) - gap
+  let startX = (containerRect.width - totalWidth) / 2
+  const keyY = 520 - 200 - 25 - 50 // 距离底部200px（配置区高度）+ 按键高度一半
+  normalKeys.forEach(key => {
     key.x = startX
     key.y = keyY
-    startX += keyW + gap
+    key.w = baseWidth + (key.span - 1) * 56
+    key.h = 50
+    startX += key.w + gap
   })
 }
 
+// Canvas绘制逻辑
 const drawKeys = () => {
   if (!ctx || !containerRect) return
-  keys.forEach(key => {
+  const normalKeys = keys.filter(k => k.type === 'normal')
+  normalKeys.forEach(key => {
     // 按键底色
     ctx.fillStyle = themeColors.bgSoft
     ctx.fillRect(key.x, key.y, key.w, key.h)
     // 边框
     ctx.lineWidth = 2
-    ctx.strokeStyle = pressed.has(key.code) ? key.color : themeColors.divider
+    const row = rows.find(r => r.id === key.rowId)!
+    ctx.strokeStyle = pressed.has(key.code) ? row.color : themeColors.divider
     ctx.strokeRect(key.x, key.y, key.w, key.h)
     // 按下缩放反馈
     if (pressed.has(key.code)) {
@@ -79,7 +129,7 @@ const drawKeys = () => {
     // 计数文字
     ctx.font = '10px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto'
     ctx.fillStyle = themeColors.text3
-    ctx.fillText(key.cnt, key.x + key.w/2, key.y + key.h/2 + 10)
+    ctx.fillText(key.cnt.toString(), key.x + key.w/2, key.y + key.h/2 + 10)
     if (pressed.has(key.code)) ctx.restore()
   })
 }
@@ -100,19 +150,80 @@ const handleDown = (code: string) => {
   if (pressed.has(code)) return
   pressed.add(code)
   kpsRecords.push(Date.now())
+  
   const key = keys.find(k => k.code === code)
   if (key) {
-    key.cnt++
-    bars.push({ x: key.x, y: 0, width: key.w, height: 2, color: key.color })
+    if (key.type === 'normal') {
+      key.cnt++
+      total.value++
+      // 生成上升条（用所属行的属性）
+      const row = rows.find(r => r.id === key.rowId)!
+      const keyEl = keys.find(k => k.code === code)!
+      bars.push({
+        x: keyEl.x + (keyEl.w - row.width) / 2,
+        y: 0,
+        width: row.width,
+        height: 2,
+        color: row.color
+      })
+      saveConfig()
+    }
   }
 }
 
 const handleUp = (code: string) => pressed.delete(code)
 
 const resetCounts = () => {
-  keys.forEach(key => key.cnt = 0)
+  keys.forEach(key => {
+    if (key.type === 'normal') key.cnt = 0
+  })
   kpsRecords.length = 0
   kps.value = 0
+  total.value = 0
+  saveConfig()
+}
+
+// 配置操作
+const deleteKey = (id: number) => {
+  const index = keys.findIndex(k => k.id === id)
+  if (index > -1) {
+    keys.splice(index, 1)
+    saveConfig()
+  }
+}
+
+const changeKeyRow = (id: number, rowId: number) => {
+  const key = keys.find(k => k.id === id)
+  if (key) {
+    key.rowId = rowId
+    saveConfig()
+  }
+}
+
+const changeKeySpan = (id: number, span: number) => {
+  const key = keys.find(k => k.id === id)
+  if (key && key.type === 'normal') {
+    key.span = span
+    saveConfig()
+  }
+}
+
+const addNewKey = () => {
+  const label = newKeyLabel.value.trim() || 'N'
+  const code = newKeyType.value === 'normal' ? `Key${label.toUpperCase()}` : `INFO_${nextKeyId.value}`
+  keys.push({
+    id: nextKeyId.value++,
+    label,
+    code,
+    rowId: 0,
+    cnt: 0,
+    type: newKeyType.value,
+    span: 1
+  })
+  newKeyLabel.value = ''
+  newKeyType.value = 'normal'
+  showModal.value = false
+  saveConfig()
 }
 
 // 【生命周期层】
@@ -122,7 +233,8 @@ onMounted(() => {
   containerRect = canvasRef.value.parentElement!.getBoundingClientRect()
   dpr = window.devicePixelRatio || 1
 
-  // 初始化主题颜色和画布
+  // 初始化
+  loadConfig()
   updateThemeColors()
   const initCanvas = () => {
     if (!canvasRef.value || !containerRect) return
@@ -135,11 +247,11 @@ onMounted(() => {
   }
   initCanvas()
 
-  // 监听主题变化，更新颜色缓存
-  const observer = new MutationObserver(() => updateThemeColors())
+  // 监听主题变化
+  const observer = new MutationObserver(updateThemeColors)
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
 
-  // 窗口 resize 适配
+  // 窗口resize
   window.addEventListener('resize', () => {
     if (!canvasRef.value) return
     containerRect = canvasRef.value.parentElement!.getBoundingClientRect()
@@ -149,11 +261,13 @@ onMounted(() => {
   // 键盘事件
   const keydownHandler = (e: KeyboardEvent) => {
     if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '')) return
-    if (keys.some(k => k.code === e.code)) handleDown(e.code)
+    const key = keys.find(k => k.code === e.code && k.type === 'normal')
+    if (key) handleDown(e.code)
   }
   const keyupHandler = (e: KeyboardEvent) => {
     if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '')) return
-    if (keys.some(k => k.code === e.code)) handleUp(e.code)
+    const key = keys.find(k => k.code === e.code && k.type === 'normal')
+    if (key) handleUp(e.code)
   }
   document.addEventListener('keydown', keydownHandler)
   document.addEventListener('keyup', keyupHandler)
@@ -180,13 +294,111 @@ onMounted(() => {
     document.removeEventListener('keyup', keyupHandler)
   })
 })
+
+// 监听按键变化，更新位置
+watch(keys, updateKeyPositions, { deep: true })
 </script>
 
 <template>
   <div class="kv-wrapper">
+    <!-- Canvas绘制区域 -->
     <canvas ref="canvasRef" class="kv-canvas"></canvas>
-    <button class="kv-reset" @click="resetCounts">重置计数</button>
-    <div class="kv-kps">KPS: {{ kps }}</div>
+    
+    <!-- 顶部信息栏 -->
+    <div class="kv-info-bar">
+      <div class="kv-kps">KPS: {{ kps }}</div>
+      <div class="kv-total">TOTAL: {{ total }}</div>
+      <button class="kv-reset" @click="resetCounts">重置计数</button>
+    </div>
+
+    <!-- 配置区域 -->
+    <div class="kv-config">
+      <!-- 按键配置 -->
+      <div class="kv-config-keys">
+        <div v-for="key in keys" :key="key.id" class="kv-config-key">
+          <button class="kv-del-btn" @click="deleteKey(key.id)" v-if="key.type === 'normal'">×</button>
+          <span class="kv-key-label">{{ key.label }}</span>
+          <div class="kv-row-btns">
+            <button 
+              v-for="row in rows" 
+              :key="row.id"
+              class="kv-row-btn"
+              :class="{ active: key.rowId === row.id }"
+              @click="changeKeyRow(key.id, row.id)"
+            >{{ row.id + 1 }}</button>
+          </div>
+          <div class="kv-span-btns" v-if="key.type === 'normal'">
+            <button 
+              v-for="span in [1,2,3,4]" 
+              :key="span"
+              class="kv-span-btn"
+              :class="{ active: key.span === span }"
+              @click="changeKeySpan(key.id, span)"
+            >{{ span }}</button>
+          </div>
+        </div>
+        <button class="kv-add-btn" @click="showModal = true">+ 添加按键</button>
+      </div>
+
+      <!-- 行配置 -->
+      <div class="kv-config-rows">
+        <div v-for="row in rows" :key="row.id" class="kv-config-row">
+          <span class="kv-row-label" :style="{ color: row.color }">第{{ row.id + 1 }}行</span>
+          <div class="kv-row-config-item">
+            <span>宽</span>
+            <input 
+              type="range" 
+              min="8" 
+              max="56" 
+              v-model.number="row.width"
+              @change="saveConfig"
+            >
+          </div>
+          <div class="kv-row-config-item">
+            <span>色</span>
+            <input 
+              type="color" 
+              v-model="row.color"
+              @change="saveConfig"
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 添加按键弹窗 -->
+    <div class="kv-modal-overlay" v-if="showModal" @click.self="showModal = false">
+      <div class="kv-modal">
+        <h3>添加按键</h3>
+        <input 
+          type="text" 
+          v-model="newKeyLabel"
+          placeholder="按键名（如 L）"
+          @keyup.enter="addNewKey"
+        >
+        <div class="kv-modal-types">
+          <button 
+            class="kv-type-btn"
+            :class="{ active: newKeyType === 'normal' }"
+            @click="newKeyType = 'normal'"
+          >普通键</button>
+          <button 
+            class="kv-type-btn"
+            :class="{ active: newKeyType === 'kps' }"
+            @click="newKeyType = 'kps'"
+          >KPS键</button>
+          <button 
+            class="kv-type-btn"
+            :class="{ active: newKeyType === 'total' }"
+            @click="newKeyType = 'total'"
+          >TOTAL键</button>
+        </div>
+        <div class="kv-modal-actions">
+          <button class="kv-cancel-btn" @click="showModal = false">取消</button>
+          <button class="kv-confirm-btn" @click="addNewKey">确定</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -195,20 +407,42 @@ onMounted(() => {
   position: relative;
   width: 100%;
   margin: 24px 0;
-}
-.kv-canvas {
-  width: 100%;
   height: 520px;
   border: 1px solid var(--vp-c-divider);
   border-radius: 8px;
-  display: block;
-  /* 显式设置canvas默认背景，避免透明导致的显示异常 */
+  overflow: hidden;
   background: var(--vp-c-bg);
 }
-.kv-reset {
+
+.kv-canvas {
+  width: 100%;
+  height: calc(520px - 200px); /* 减去配置区高度 */
+  display: block;
+}
+
+/* 顶部信息栏 */
+.kv-info-bar {
   position: absolute;
-  top: 32px;
+  top: 10px;
+  left: 10px;
   right: 10px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.kv-kps, .kv-total {
+  padding: 4px 8px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 4px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.kv-reset {
+  margin-left: auto;
   padding: 4px 8px;
   border: 1px solid var(--vp-c-divider);
   border-radius: 4px;
@@ -217,17 +451,222 @@ onMounted(() => {
   font-size: 12px;
   cursor: pointer;
 }
-.kv-kps {
+
+/* 配置区域 */
+.kv-config {
   position: absolute;
-  top: 32px;
-  left: 10px;
-  padding: 4px 8px;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 4px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
   background: var(--vp-c-bg-soft);
+  border-top: 1px solid var(--vp-c-divider);
+  padding: 12px;
+  display: flex;
+  gap: 16px;
+  overflow: auto;
+}
+
+.kv-config-keys {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-content: flex-start;
+}
+
+.kv-config-key {
+  position: relative;
+  padding: 8px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg-mute);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 80px;
+}
+
+.kv-del-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--vp-c-danger);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.kv-key-label {
+  font-size: 13px;
   color: var(--vp-c-text-1);
+  text-align: center;
+}
+
+.kv-row-btns, .kv-span-btns {
+  display: flex;
+  gap: 2px;
+}
+
+.kv-row-btn, .kv-span-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.kv-row-btn.active, .kv-span-btn.active {
+  border-color: var(--vp-c-brand);
+  background: var(--vp-c-brand-dimm);
+  color: var(--vp-c-brand);
+}
+
+.kv-add-btn {
+  padding: 8px 12px;
+  border: 2px dashed var(--vp-c-divider);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+/* 行配置 */
+.kv-config-rows {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-content: flex-start;
+}
+
+.kv-config-row {
+  padding: 8px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg-mute);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 100px;
+}
+
+.kv-row-label {
   font-size: 12px;
   font-weight: bold;
+}
+
+.kv-row-config-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--vp-c-text-3);
+}
+
+.kv-row-config-item input[type="range"] {
+  width: 60px;
+}
+
+.kv-row-config-item input[type="color"] {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+}
+
+/* 弹窗 */
+.kv-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.kv-modal {
+  background: var(--vp-c-bg-elv);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  padding: 20px;
+  width: 300px;
+  max-width: 90vw;
+}
+
+.kv-modal h3 {
+  margin: 0 0 16px 0;
+  color: var(--vp-c-text-1);
+  font-size: 16px;
+}
+
+.kv-modal input[type="text"] {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.kv-modal-types {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.kv-type-btn {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.kv-type-btn.active {
+  border-color: var(--vp-c-brand);
+  background: var(--vp-c-brand-dimm);
+  color: var(--vp-c-brand);
+}
+
+.kv-modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.kv-cancel-btn, .kv-confirm-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.kv-cancel-btn {
+  background: var(--vp-c-bg-mute);
+  color: var(--vp-c-text-1);
+}
+
+.kv-confirm-btn {
+  background: var(--vp-c-brand);
+  color: white;
 }
 </style>
 
