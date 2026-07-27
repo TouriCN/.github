@@ -1,15 +1,12 @@
 # KeyView
-<!-- 【核心修复】用VitePress官方的ClientOnly包裹，SSR阶段完全跳过渲染，从根上避免DOM报错 -->
-<ClientOnly>
-  <script setup lang="ts">
+<!-- 【正确结构】script和style是SFC顶层块，不能放进ClientOnly -->
+<script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 
-// 【工具函数：读取CSS变量】
 const getCssVar = (name: string): string => {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-// 【状态层：核心数据】
 const canvasRef = ref<HTMLCanvasElement>()
 const kps = ref(0)
 const total = ref(0)
@@ -18,7 +15,6 @@ const newKeyLabel = ref('')
 const newKeyType = ref<'normal' | 'kps' | 'total'>('normal')
 const nextKeyId = ref(7)
 
-// 行配置（对应上升条属性）
 const rows = reactive([
   { id: 0, width: 52, color: '#ff3366' },
   { id: 1, width: 40, color: '#ff9f43' },
@@ -26,7 +22,6 @@ const rows = reactive([
   { id: 3, width: 16, color: '#00ff88' }
 ])
 
-// 按键配置
 const keys = reactive([
   { id: 1, label: 'F', code: 'KeyF', rowId: 0, cnt: 0, type: 'normal' as const, span: 1 },
   { id: 2, label: 'G', code: 'KeyG', rowId: 0, cnt: 0, type: 'normal' as const, span: 1 },
@@ -36,7 +31,6 @@ const keys = reactive([
   { id: 6, label: 'TOTAL', code: 'TOTAL_INFO', rowId: 1, cnt: 0, type: 'total' as const, span: 2 }
 ])
 
-// 运行时状态
 const pressed = new Set<string>()
 const bars: Array<{x:number,y:number,width:number,height:number,color:string}> = []
 const kpsRecords: number[] = []
@@ -50,7 +44,6 @@ let themeColors = {
   text3: '#64748b'
 }
 
-// 【工具方法层】
 const updateThemeColors = () => {
   themeColors.bgSoft = getCssVar('--vp-c-bg-soft') || '#f6f6f7'
   themeColors.divider = getCssVar('--vp-c-divider') || '#e2e8f0'
@@ -58,7 +51,6 @@ const updateThemeColors = () => {
   themeColors.text3 = getCssVar('--vp-c-text-3') || '#64748b'
 }
 
-// 本地存储
 const saveConfig = () => {
   try {
     localStorage.setItem('keyview_config', JSON.stringify({
@@ -82,7 +74,6 @@ const loadConfig = () => {
   } catch {}
 }
 
-// 计算按键位置
 const updateKeyPositions = () => {
   if (!containerRect) return
   const baseWidth = 50
@@ -90,7 +81,7 @@ const updateKeyPositions = () => {
   const normalKeys = keys.filter(k => k.type === 'normal')
   const totalWidth = normalKeys.reduce((sum, k) => sum + baseWidth + (k.span - 1) * 56 + gap, 0) - gap
   let startX = (containerRect.width - totalWidth) / 2
-  const keyY = 320 - 25 - 50 // Canvas高度320px，减去自身高度和边距
+  const keyY = 320 - 25 - 50
   normalKeys.forEach(key => {
     key.x = startX
     key.y = keyY
@@ -100,7 +91,6 @@ const updateKeyPositions = () => {
   })
 }
 
-// Canvas绘制逻辑
 const drawKeys = () => {
   if (!ctx || !containerRect) return
   const normalKeys = keys.filter(k => k.type === 'normal')
@@ -140,7 +130,6 @@ const drawBars = () => {
   }
 }
 
-// 【业务逻辑层】
 const handleDown = (code: string) => {
   if (pressed.has(code)) return
   pressed.add(code)
@@ -177,7 +166,6 @@ const resetCounts = () => {
   saveConfig()
 }
 
-// 配置操作
 const deleteKey = (id: number) => {
   const index = keys.findIndex(k => k.id === id)
   if (index > -1) {
@@ -220,14 +208,12 @@ const addNewKey = () => {
   saveConfig()
 }
 
-// 【生命周期层】
 onMounted(() => {
   if (!canvasRef.value) return
   ctx = canvasRef.value.getContext('2d')
   containerRect = canvasRef.value.parentElement!.getBoundingClientRect()
   dpr = window.devicePixelRatio || 1
 
-  // 初始化
   loadConfig()
   updateThemeColors()
   const initCanvas = () => {
@@ -241,18 +227,15 @@ onMounted(() => {
   }
   initCanvas()
 
-  // 监听主题变化
   const observer = new MutationObserver(updateThemeColors)
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
 
-  // 窗口resize
   window.addEventListener('resize', () => {
     if (!canvasRef.value) return
     containerRect = canvasRef.value.parentElement!.getBoundingClientRect()
     initCanvas()
   })
 
-  // 键盘事件
   const keydownHandler = (e: KeyboardEvent) => {
     if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName || '')) return
     const key = keys.find(k => k.code === e.code && k.type === 'normal')
@@ -267,7 +250,6 @@ onMounted(() => {
   document.addEventListener('keyup', keyupHandler)
   window.addEventListener('blur', () => pressed.clear())
 
-  // 动画循环
   const animate = () => {
     if (!ctx || !containerRect) return
     ctx.clearRect(0, 0, containerRect.width, 320)
@@ -280,7 +262,6 @@ onMounted(() => {
   }
   animate()
 
-  // 清理
   onUnmounted(() => {
     observer.disconnect()
     document.removeEventListener('keydown', keydownHandler)
@@ -288,114 +269,111 @@ onMounted(() => {
   })
 })
 
-// 延迟到DOM更新后执行，避免时序问题
 watch(keys, updateKeyPositions, { deep: true, flush: 'post' })
 </script>
 
-<template>
-  <div class="kv-wrapper">
-    <!-- Canvas绘制区域 -->
-    <canvas ref="canvasRef" class="kv-canvas"></canvas>
-    
-    <!-- 顶部信息栏 -->
-    <div class="kv-info-bar">
-      <div class="kv-kps">KPS: {{ kps }}</div>
-      <div class="kv-total">TOTAL: {{ total }}</div>
-      <button class="kv-reset" @click="resetCounts">重置计数</button>
-    </div>
+<!-- 【ClientOnly只包裹模板内容】SSR阶段不会渲染这里的DOM，避免浏览器API报错 -->
+<ClientOnly>
+  <template>
+    <div class="kv-wrapper">
+      <canvas ref="canvasRef" class="kv-canvas"></canvas>
+      
+      <div class="kv-info-bar">
+        <div class="kv-kps">KPS: {{ kps }}</div>
+        <div class="kv-total">TOTAL: {{ total }}</div>
+        <button class="kv-reset" @click="resetCounts">重置计数</button>
+      </div>
 
-    <!-- 配置区域 -->
-    <div class="kv-config">
-      <!-- 按键配置 -->
-      <div class="kv-config-keys">
-        <div v-for="key in keys" :key="key.id" class="kv-config-key">
-          <button class="kv-del-btn" @click="deleteKey(key.id)" v-if="key.type === 'normal'">×</button>
-          <span class="kv-key-label">{{ key.label }}</span>
-          <div class="kv-row-btns">
+      <div class="kv-config">
+        <div class="kv-config-keys">
+          <div v-for="key in keys" :key="key.id" class="kv-config-key">
+            <button class="kv-del-btn" @click="deleteKey(key.id)" v-if="key.type === 'normal'">×</button>
+            <span class="kv-key-label">{{ key.label }}</span>
+            <div class="kv-row-btns">
+              <button 
+                v-for="row in rows" 
+                :key="row.id"
+                class="kv-row-btn"
+                :class="{ active: key.rowId === row.id }"
+                @click="changeKeyRow(key.id, row.id)"
+              >{{ row.id + 1 }}</button>
+            </div>
+            <div class="kv-span-btns" v-if="key.type === 'normal'">
+              <button 
+                v-for="span in [1,2,3,4]" 
+                :key="span"
+                class="kv-span-btn"
+                :class="{ active: key.span === span }"
+                @click="changeKeySpan(key.id, span)"
+              >{{ span }}</button>
+            </div>
+          </div>
+          <button class="kv-add-btn" @click="showModal = true">+ 添加按键</button>
+        </div>
+
+        <div class="kv-config-rows">
+          <div v-for="row in rows" :key="row.id" class="kv-config-row">
+            <span class="kv-row-label" :style="{ color: row.color }">第{{ row.id + 1 }}行</span>
+            <div class="kv-row-config-item">
+              <span>宽</span>
+              <input 
+                type="range" 
+                min="8" 
+                max="56" 
+                v-model.number="row.width"
+                @change="saveConfig"
+              >
+            </div>
+            <div class="kv-row-config-item">
+              <span>色</span>
+              <input 
+                type="color" 
+                v-model="row.color"
+                @change="saveConfig"
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kv-modal-overlay" v-if="showModal" @click.self="showModal = false">
+        <div class="kv-modal">
+          <h3>添加按键</h3>
+          <input 
+            type="text" 
+            v-model="newKeyLabel"
+            placeholder="按键名（如 L）"
+            @keyup.enter="addNewKey"
+          >
+          <div class="kv-modal-types">
             <button 
-              v-for="row in rows" 
-              :key="row.id"
-              class="kv-row-btn"
-              :class="{ active: key.rowId === row.id }"
-              @click="changeKeyRow(key.id, row.id)"
-            >{{ row.id + 1 }}</button>
-          </div>
-          <div class="kv-span-btns" v-if="key.type === 'normal'">
+              class="kv-type-btn"
+              :class="{ active: newKeyType === 'normal' }"
+              @click="newKeyType = 'normal'"
+            >普通键</button>
             <button 
-              v-for="span in [1,2,3,4]" 
-              :key="span"
-              class="kv-span-btn"
-              :class="{ active: key.span === span }"
-              @click="changeKeySpan(key.id, span)"
-            >{{ span }}</button>
+              class="kv-type-btn"
+              :class="{ active: newKeyType === 'kps' }"
+              @click="newKeyType = 'kps'"
+            >KPS键</button>
+            <button 
+              class="kv-type-btn"
+              :class="{ active: newKeyType === 'total' }"
+              @click="newKeyType = 'total'"
+            >TOTAL键</button>
           </div>
-        </div>
-        <button class="kv-add-btn" @click="showModal = true">+ 添加按键</button>
-      </div>
-
-      <!-- 行配置 -->
-      <div class="kv-config-rows">
-        <div v-for="row in rows" :key="row.id" class="kv-config-row">
-          <span class="kv-row-label" :style="{ color: row.color }">第{{ row.id + 1 }}行</span>
-          <div class="kv-row-config-item">
-            <span>宽</span>
-            <input 
-              type="range" 
-              min="8" 
-              max="56" 
-              v-model.number="row.width"
-              @change="saveConfig"
-            >
-          </div>
-          <div class="kv-row-config-item">
-            <span>色</span>
-            <input 
-              type="color" 
-              v-model="row.color"
-              @change="saveConfig"
-            >
+          <div class="kv-modal-actions">
+            <button class="kv-cancel-btn" @click="showModal = false">取消</button>
+            <button class="kv-confirm-btn" @click="addNewKey">确定</button>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- 添加按键弹窗 -->
-    <div class="kv-modal-overlay" v-if="showModal" @click.self="showModal = false">
-      <div class="kv-modal">
-        <h3>添加按键</h3>
-        <input 
-          type="text" 
-          v-model="newKeyLabel"
-          placeholder="按键名（如 L）"
-          @keyup.enter="addNewKey"
-        >
-        <div class="kv-modal-types">
-          <button 
-            class="kv-type-btn"
-            :class="{ active: newKeyType === 'normal' }"
-            @click="newKeyType = 'normal'"
-          >普通键</button>
-          <button 
-            class="kv-type-btn"
-            :class="{ active: newKeyType === 'kps' }"
-            @click="newKeyType = 'kps'"
-          >KPS键</button>
-          <button 
-            class="kv-type-btn"
-            :class="{ active: newKeyType === 'total' }"
-            @click="newKeyType = 'total'"
-          >TOTAL键</button>
-        </div>
-        <div class="kv-modal-actions">
-          <button class="kv-cancel-btn" @click="showModal = false">取消</button>
-          <button class="kv-confirm-btn" @click="addNewKey">确定</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
+  </template>
+</ClientOnly>
 
 <style>
+/* style也是SFC顶层块，不能放进ClientOnly */
 .kv-wrapper {
   position: relative;
   width: 100%;
@@ -413,7 +391,6 @@ watch(keys, updateKeyPositions, { deep: true, flush: 'post' })
   display: block;
 }
 
-/* 顶部信息栏 */
 .kv-info-bar {
   position: absolute;
   top: 10px;
@@ -445,7 +422,6 @@ watch(keys, updateKeyPositions, { deep: true, flush: 'post' })
   cursor: pointer;
 }
 
-/* 配置区域 */
 .kv-config {
   position: absolute;
   bottom: 0;
@@ -532,7 +508,6 @@ watch(keys, updateKeyPositions, { deep: true, flush: 'post' })
   align-self: flex-start;
 }
 
-/* 行配置 */
 .kv-config-rows {
   display: flex;
   gap: 12px;
@@ -575,7 +550,6 @@ watch(keys, updateKeyPositions, { deep: true, flush: 'post' })
   background: none;
 }
 
-/* 弹窗 */
 .kv-modal-overlay {
   position: fixed;
   top: 0;
@@ -662,7 +636,6 @@ watch(keys, updateKeyPositions, { deep: true, flush: 'post' })
   color: white;
 }
 </style>
-</ClientOnly>
 
 ## 该工具有什么用处？
 可用于显示游戏中输入的按键，如果您发布视频的话，这实际上可以很方便地给观众查看手法。
