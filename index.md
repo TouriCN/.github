@@ -11,7 +11,7 @@ hero:
 features:
   - title: "哦，对了；我们还有一个《我的世界》服务器…"
     details: "你可以了解一下，就在这里"
-    link: "https://github.com/TouriCN/TouriCNParkOur"
+    link: "https://github.com/TouriCN/TouriCNParkOurMC"
     linkText: "进入GitHub仓库!"
 ---
 <!-- SITE_INFO_START -->
