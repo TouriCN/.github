@@ -7,6 +7,12 @@ hero:
   name: "TouriCN"
   text: "一个神秘的站点。"
   tagline: 该站点会发布一些好玩的东西。
+
+features:
+  - title: "哦，对了；我们还有一个《我的世界》服务器…"
+    details: "你可以了解一下，就在这里"
+    link: "https://github.com/TouriCN/TouriCNParkOur"
+    linkText: "进入GitHub仓库!"
 ---
 <!-- SITE_INFO_START -->
 
