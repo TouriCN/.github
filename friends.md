@@ -14,5 +14,6 @@
 | <img src="https://realityandlord.net/wp-content/uploads/2026/03/cropped-TRUTH.png"> |
  
 | [BlackArea](https://wiki.yddns.top/mediawiki/index.php?title=Main_Page) |
+|:----------|
 | 黑域 |
 | <img src="https://wiki.yddns.top/mediawiki/resources/assets/Black Area.jpg"> |
