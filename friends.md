@@ -1,3 +1,6 @@
+<!-- NAV-START -->
+
+<!-- NAV-END -->
 | 友谊链接 |
 |:-------|
 | 这里是一些我的友人。 |
@@ -17,3 +20,8 @@
 |:----------|
 | 黑域 |
 | <img src="https://wiki.yddns.top/mediawiki/resources/assets/Black Area.jpg"> |
+
+<!-- BOTTOM-START -->
+
+<!-- BOTTOM-END -->
+
