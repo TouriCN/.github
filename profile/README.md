@@ -16,18 +16,18 @@
 
 | 字段 | 值 |
 | :---: | :---: |
-| 构建时间 | 2026/08/26 17:10:24 |
+| 构建时间 | 2026/08/26 22:18:17 |
 | 提交者 | TouriCN-Tourism |
-| 提交信息 | Merge pull request #2 from TouriCN/TouriCN-Tourism-patch-1 |
-| 提交哈希 | 902cdbe |
+| 提交信息 | build: update nav, bottom and site info |
+| 提交哈希 | a0cba0d |
 | 文件数 | 9 |
-| 总字数 | 2216 |
+| 总字数 | 2220 |
 | 每文件平均字数 | 246 |
 
 <!-- SITE_INFO_END -->
 
 <!-- BOTTOM-START -->
-*最后更新：2026-08-26 09:10 UTC*
+*最后更新：2026-08-26 14:18 UTC*
 
 > ###### ©2026 TouriCN|MIT License
 <!-- BOTTOM-END -->
