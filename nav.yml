@@ -10,6 +10,7 @@ scan_dirs:
 
 exclude:
   - "profile/README.md"
+  - "posts/README.md"
   - "friend.md"
 
-bottom: "###### ©2026 TouriCN|MIT License" 
+bottom: "(这可能是一种对于GitHub的新奇玩法)<br> ###### ©2026 TouriCN|MIT License" 
