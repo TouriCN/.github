@@ -16,20 +16,20 @@
 
 | 字段 | 值 |
 | :---: | :---: |
-| 构建时间 | 2026/08/26 22:20:06 |
+| 构建时间 | 2026/08/26 22:38:58 |
 | 提交者 | TouriCN-Tourism |
-| 提交信息 | Enhance deploy workflow with dependency and site info |
-| 提交哈希 | a1a6670 |
+| 提交信息 | Update nav.yml |
+| 提交哈希 | 175b021 |
 | 文件数 | 9 |
-| 总字数 | 2239 |
-| 每文件平均字数 | 248 |
+| 总字数 | 2370 |
+| 每文件平均字数 | 263 |
 
 <!-- SITE_INFO_END -->
 
 <!-- BOTTOM-START -->
-*最后更新：2026-08-26 14:20 UTC*
+*最后更新：2026-08-26 14:38 UTC*
 
-> ###### ©2026 TouriCN|MIT License
+> (这可能是一种对于GitHub的新奇玩法)<br> ###### ©2026 TouriCN|MIT License
 <!-- BOTTOM-END -->
 
 
