@@ -159,8 +159,9 @@ jobs:
 
       - name: Commit and Push
         run: |
-          git config user.name "WatchDreamer Bot"
-          git config user.email "bot@watchdreamer.local"
+          git config user.name "TouriCN Bot"
+          git config user.email "bot@touricn.local"
+
           git add -A
           git diff --staged --quiet || git commit -m "build: update nav, bottom and site info"
           git push
