@@ -15,6 +15,9 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: 安装依赖
+        run: pip install pyyaml
+
       - name: 注入顶部导航 + 底部区域
         run: |
           python3 << 'EOF'
@@ -29,7 +32,6 @@ jobs:
           exclude = set(os.path.normpath(p) for p in (cfg.get('exclude') or []))
           bottom_text = (cfg.get('bottom') or '').strip()
 
-          # 自动扫描分组
           auto_groups = {}
           file2group = {}
 
@@ -55,13 +57,17 @@ jobs:
                       for _, link in pages:
                           file2group[link] = gname
 
-          # Navbar
-          nav_cells = [f"**{brand}**"]
-          for item in navbar_items:
-              name, link = item.split(', ', 1)
-              nav_cells.append(f"[{name}]({link})")
-          nav_sep = "| :--- | " + " | ".join([":---:"] * len(navbar_items)) + " |"
-          NAV = f"<!-- NAV-START -->\n| {' | '.join(nav_cells)} |\n{nav_sep}\n<!-- NAV-END -->"
+          nav_links = " &nbsp; ".join(
+              f"[{name}]({link})"
+              for item in navbar_items
+              for name, link in [item.split(', ', 1)]
+          )
+          NAV = (
+              "<!-- NAV-START -->\n"
+              f"| **{brand}** | {nav_links} |\n"
+              "| :--- | ---: |\n"
+              "<!-- NAV-END -->"
+          )
 
           now = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
 
@@ -72,14 +78,12 @@ jobs:
               with open(path, 'r') as f:
                   content = f.read()
 
-              # 顶部 Navbar
               if '<!-- NAV-START -->' in content:
                   content = re.sub(r'<!-- NAV-START -->.*?<!-- NAV-END -->',
                                    NAV, content, flags=re.DOTALL)
               else:
                   content = NAV + '\n\n' + content
 
-              # 底部
               bottom = []
               bottom.append(f'*最后更新：{now}*')
               bottom.append('')
@@ -112,38 +116,58 @@ jobs:
                   f.write(content)
               print(f"done: {path}")
 
-          print("all done")
+          print("navbar + bottom injected")
           EOF
 
       - name: 注入站点信息到 profile/README.md
         run: |
-          HASH=$(git rev-parse --short HEAD)
-          AUTHOR=${{ github.actor }}
-          MSG=$(git log -1 --format=%s)
-          BUILD_TIME=$(TZ=Asia/Shanghai date '+%Y/%m/%d %H:%M:%S')
-          FILES=$(find . -name "*.md" ! -path "./node_modules/*" ! -path "./.git/*" | wc -l)
-          TOTAL_WORDS=$(node -e "const fs=require('fs');const f=process.argv;let t=0;f.slice(1).forEach(x=>{const c=fs.readFileSync(x,'utf-8');t+=(c.match(/[\u4e00-\u9fa5]/g)||[]).length+(c.match(/[a-zA-Z]+/g)||[]).length});console.log(t)" $(find . -name "*.md" ! -path "./node_modules/*" ! -path "./.git/*"))
-          AVG_WORDS=$((FILES > 0 ? TOTAL_WORDS / FILES : 0))
+          python3 << 'EOF'
+          import re, glob, os, subprocess, datetime
 
-          python3 << EOF
-          import re
+          os.makedirs('profile', exist_ok=True)
+          profile_path = 'profile/README.md'
+          if not os.path.exists(profile_path):
+              with open(profile_path, 'w') as f:
+                  f.write('# TouriCN\n')
 
-          table = """<!-- SITE_INFO_START -->
+          def git_log(fmt):
+              return subprocess.check_output(['git', 'log', '-1', f'--format={fmt}']).decode().strip()
+
+          author = os.environ.get('GITHUB_ACTOR', git_log('%an'))
+          msg = git_log('%s')
+          hash_short = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode().strip()
+
+          utc_now = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+          build_time = utc_now.strftime('%Y/%m/%d %H:%M:%S')
+
+          files = [f for f in glob.glob('**/*.md', recursive=True)
+                   if 'node_modules' not in f and '.git' not in f]
+          total_files = len(files)
+          total_words = 0
+          for f in files:
+              with open(f, 'r', encoding='utf-8') as mf:
+                  c = mf.read()
+              chinese = len(re.findall(r'[\u4e00-\u9fa5]', c))
+              english = len(re.findall(r'[a-zA-Z]+', c))
+              total_words += chinese + english
+          avg_words = total_words // total_files if total_files > 0 else 0
+
+          table = f"""<!-- SITE_INFO_START -->
           ## 站点信息
 
           | 字段 | 值 |
           | :---: | :---: |
-          | 构建时间 | ${BUILD_TIME} |
-          | 提交者 | ${AUTHOR} |
-          | 提交信息 | ${MSG} |
-          | 提交哈希 | ${HASH} |
-          | 文件数 | ${FILES} |
-          | 总字数 | ${TOTAL_WORDS} |
-          | 每文件平均字数 | ${AVG_WORDS} |
+          | 构建时间 | {build_time} |
+          | 提交者 | {author} |
+          | 提交信息 | {msg} |
+          | 提交哈希 | {hash_short} |
+          | 文件数 | {total_files} |
+          | 总字数 | {total_words} |
+          | 每文件平均字数 | {avg_words} |
 
           <!-- SITE_INFO_END -->"""
 
-          with open('profile/README.md', 'r') as f:
+          with open(profile_path, 'r') as f:
               c = f.read()
 
           if '<!-- SITE_INFO_START -->' in c:
@@ -151,7 +175,7 @@ jobs:
           else:
               c = c.rstrip() + '\n\n' + table
 
-          with open('profile/README.md', 'w') as f:
+          with open(profile_path, 'w') as f:
               f.write(c)
 
           print("site info injected")
@@ -161,7 +185,6 @@ jobs:
         run: |
           git config user.name "TouriCN Bot"
           git config user.email "bot@touricn.local"
-
           git add -A
           git diff --staged --quiet || git commit -m "build: update nav, bottom and site info"
           git push
