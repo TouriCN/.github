@@ -1,15 +1,15 @@
 brand: TouriCN
 
 navbar:
-  - "主页, /"
+  - "主页, /profile/README.md"
   - "文章, /posts"
-  - "工具, /tools"
   - "友谊链接, /friends.md"
 
 scan_dirs:
   - "."
 
 exclude:
-  - "README.md"
+  - "profile/README.md"
+  - "friend.md"
 
 bottom: "###### ©2026 TouriCN|MIT License" 
