@@ -1,31 +1,121 @@
-name: Deploy VitePress Site
+name: 站点构建
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+      - name: 注入顶部导航 + 底部区域
+        run: |
+          python3 << 'EOF'
+          import yaml, glob, re, os, datetime
 
-      # 统计信息 + 注入Markdown表格（单行echo，无格式风险）
-      - name: Inject site info markdown
+          with open('nav.yml') as f:
+              cfg = yaml.safe_load(f)
+
+          brand = cfg['brand']
+          navbar_items = cfg['navbar']
+          scan_dirs = cfg.get('scan_dirs', ['.'])
+          exclude = set(os.path.normpath(p) for p in (cfg.get('exclude') or []))
+          bottom_text = (cfg.get('bottom') or '').strip()
+
+          # 自动扫描分组
+          auto_groups = {}
+          file2group = {}
+
+          for scan_dir in scan_dirs:
+              if not os.path.isdir(scan_dir):
+                  continue
+              for root, dirs, _ in os.walk(scan_dir):
+                  if root == scan_dir:
+                      continue
+                  gname = os.path.basename(root)
+                  pages = []
+                  for md in sorted(glob.glob(os.path.join(root, '*.md'))):
+                      with open(md, 'r') as mf:
+                          first = mf.readline().strip()
+                      if first.startswith('# '):
+                          title = first[2:].strip()
+                      else:
+                          title = os.path.splitext(os.path.basename(md))[0]
+                      rel_link = os.path.normpath(md).replace(os.sep, '/')
+                      pages.append((title, rel_link))
+                  if pages:
+                      auto_groups[gname] = pages
+                      for _, link in pages:
+                          file2group[link] = gname
+
+          # Navbar
+          nav_cells = [f"**{brand}**"]
+          for item in navbar_items:
+              name, link = item.split(', ', 1)
+              nav_cells.append(f"[{name}]({link})")
+          nav_sep = "| :--- | " + " | ".join([":---:"] * len(navbar_items)) + " |"
+          NAV = f"<!-- NAV-START -->\n| {' | '.join(nav_cells)} |\n{nav_sep}\n<!-- NAV-END -->"
+
+          now = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+
+          files = glob.glob('*.md') + glob.glob('**/*.md', recursive=True)
+
+          for path in files:
+              norm = os.path.normpath(path).replace(os.sep, '/')
+              with open(path, 'r') as f:
+                  content = f.read()
+
+              # 顶部 Navbar
+              if '<!-- NAV-START -->' in content:
+                  content = re.sub(r'<!-- NAV-START -->.*?<!-- NAV-END -->',
+                                   NAV, content, flags=re.DOTALL)
+              else:
+                  content = NAV + '\n\n' + content
+
+              # 底部
+              bottom = []
+              bottom.append(f'*最后更新：{now}*')
+              bottom.append('')
+
+              if norm in file2group and norm not in exclude:
+                  gname = file2group[norm]
+                  pages = auto_groups[gname]
+                  lines = []
+                  for title, link in pages:
+                      if link == norm:
+                          lines.append(f"- **{title}**（当前）")
+                      else:
+                          lines.append(f"- [{title}]({link})")
+                  bottom.append(f"| **{gname}** | {'<br>'.join(lines)} |")
+                  bottom.append("|---|---|")
+                  bottom.append('')
+
+              if bottom_text:
+                  bottom.append(f"> {bottom_text}")
+
+              BOTTOM = '<!-- BOTTOM-START -->\n' + '\n'.join(bottom) + '\n<!-- BOTTOM-END -->'
+
+              if '<!-- BOTTOM-START -->' in content:
+                  content = re.sub(r'<!-- BOTTOM-START -->.*?<!-- BOTTOM-END -->',
+                                   BOTTOM, content, flags=re.DOTALL)
+              else:
+                  content = content.rstrip() + '\n\n' + BOTTOM
+
+              with open(path, 'w') as f:
+                  f.write(content)
+              print(f"done: {path}")
+
+          print("all done")
+          EOF
+
+      - name: 注入站点信息到 profile/README.md
         run: |
           HASH=$(git rev-parse --short HEAD)
           AUTHOR=${{ github.actor }}
@@ -34,43 +124,43 @@ jobs:
           FILES=$(find . -name "*.md" ! -path "./node_modules/*" ! -path "./.git/*" | wc -l)
           TOTAL_WORDS=$(node -e "const fs=require('fs');const f=process.argv;let t=0;f.slice(1).forEach(x=>{const c=fs.readFileSync(x,'utf-8');t+=(c.match(/[\u4e00-\u9fa5]/g)||[]).length+(c.match(/[a-zA-Z]+/g)||[]).length});console.log(t)" $(find . -name "*.md" ! -path "./node_modules/*" ! -path "./.git/*"))
           AVG_WORDS=$((FILES > 0 ? TOTAL_WORDS / FILES : 0))
-          # 清除旧表格
-          sed -i '/<!-- SITE_INFO_START -->/,/<!-- SITE_INFO_END -->/d' index.md
-          # 竖式表格：每行一个字段，左字段名右值
-          echo "" >> index.md
-          echo "<!-- SITE_INFO_START -->" >> index.md
-          echo "## 站点信息" >> index.md
-          echo "" >> index.md
-          echo "| 字段 | 值 |" >> index.md
-          echo "| :--- | :--- |" >> index.md
-          echo "| 构建时间 | ${BUILD_TIME} |" >> index.md
-          echo "| 提交者 | ${AUTHOR} |" >> index.md
-          echo "| 提交信息 | ${MSG} |" >> index.md
-          echo "| 提交哈希 | ${HASH} |" >> index.md
-          echo "| 文件数 | ${FILES} |" >> index.md
-          echo "| 总字数 | ${TOTAL_WORDS} |" >> index.md
-          echo "| 每文件平均字数 | ${AVG_WORDS} |" >> index.md
-          echo "" >> index.md
-          echo "<!-- SITE_INFO_END -->" >> index.md
 
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
+          python3 << EOF
+          import re
 
-      - name: Build VitePress site
-        run: npm run docs:build
+          table = """<!-- SITE_INFO_START -->
+          ## 站点信息
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .vitepress/dist
+          | 字段 | 值 |
+          | :---: | :---: |
+          | 构建时间 | ${BUILD_TIME} |
+          | 提交者 | ${AUTHOR} |
+          | 提交信息 | ${MSG} |
+          | 提交哈希 | ${HASH} |
+          | 文件数 | ${FILES} |
+          | 总字数 | ${TOTAL_WORDS} |
+          | 每文件平均字数 | ${AVG_WORDS} |
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          <!-- SITE_INFO_END -->"""
+
+          with open('profile/README.md', 'r') as f:
+              c = f.read()
+
+          if '<!-- SITE_INFO_START -->' in c:
+              c = re.sub(r'<!-- SITE_INFO_START -->.*?<!-- SITE_INFO_END -->', table, c, flags=re.DOTALL)
+          else:
+              c = c.rstrip() + '\n\n' + table
+
+          with open('profile/README.md', 'w') as f:
+              f.write(c)
+
+          print("site info injected")
+          EOF
+
+      - name: Commit and Push
+        run: |
+          git config user.name "WatchDreamer Bot"
+          git config user.email "bot@watchdreamer.local"
+          git add -A
+          git diff --staged --quiet || git commit -m "build: update nav, bottom and site info"
+          git push
