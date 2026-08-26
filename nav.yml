@@ -12,4 +12,4 @@ scan_dirs:
 exclude:
   - "README.md"
 
-bottom:###### ©2026 TouriCN|The Unlicense
+bottom: "###### ©2026 TouriCN|MIT License" 
