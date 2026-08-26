@@ -1,6 +1,6 @@
 <!-- NAV-START -->
-| **TouriCN** | [主页](/) | [文章](/posts) | [工具](/tools) | [友谊链接](/friends.md) |
-| :--- | :---: | :---: | :---: | :---: |
+| **TouriCN** | [主页](/profile/README.md) | [文章](/posts) | [友谊链接](/friends.md) |
+| :--- | :---: | :---: | :---: |
 <!-- NAV-END -->
 | **TouriCN** |
 |:-------|
@@ -16,21 +16,18 @@
 
 | 字段 | 值 |
 | :---: | :---: |
-| 构建时间 | 2026/08/26 16:26:53 |
+| 构建时间 | 2026/08/26 17:10:24 |
 | 提交者 | TouriCN-Tourism |
-| 提交信息 | Update nav.yml |
-| 提交哈希 | 93ad6a4 |
+| 提交信息 | Merge pull request #2 from TouriCN/TouriCN-Tourism-patch-1 |
+| 提交哈希 | 902cdbe |
 | 文件数 | 9 |
-| 总字数 | 2178 |
-| 每文件平均字数 | 242 |
+| 总字数 | 2216 |
+| 每文件平均字数 | 246 |
 
 <!-- SITE_INFO_END -->
 
 <!-- BOTTOM-START -->
-*最后更新：2026-08-26 08:26 UTC*
-
-| **profile** | - **README**（当前） |
-|---|---|
+*最后更新：2026-08-26 09:10 UTC*
 
 > ###### ©2026 TouriCN|MIT License
 <!-- BOTTOM-END -->
