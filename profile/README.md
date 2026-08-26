@@ -1,6 +1,6 @@
 <!-- NAV-START -->
-| **TouriCN** | [主页](/profile/README.md) | [文章](/posts) | [友谊链接](/friends.md) |
-| :--- | :---: | :---: | :---: |
+| **TouriCN** | [主页](/profile/README.md) &nbsp; [文章](/posts) &nbsp; [友谊链接](/friends.md) |
+| :--- | ---: |
 <!-- NAV-END -->
 | **TouriCN** |
 |:-------|
@@ -16,18 +16,18 @@
 
 | 字段 | 值 |
 | :---: | :---: |
-| 构建时间 | 2026/08/26 22:18:17 |
+| 构建时间 | 2026/08/26 22:20:06 |
 | 提交者 | TouriCN-Tourism |
-| 提交信息 | build: update nav, bottom and site info |
-| 提交哈希 | a0cba0d |
+| 提交信息 | Enhance deploy workflow with dependency and site info |
+| 提交哈希 | a1a6670 |
 | 文件数 | 9 |
-| 总字数 | 2220 |
-| 每文件平均字数 | 246 |
+| 总字数 | 2239 |
+| 每文件平均字数 | 248 |
 
 <!-- SITE_INFO_END -->
 
 <!-- BOTTOM-START -->
-*最后更新：2026-08-26 14:18 UTC*
+*最后更新：2026-08-26 14:20 UTC*
 
 > ###### ©2026 TouriCN|MIT License
 <!-- BOTTOM-END -->

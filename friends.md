@@ -1,6 +1,6 @@
 <!-- NAV-START -->
-| **TouriCN** | [主页](/profile/README.md) | [文章](/posts) | [友谊链接](/friends.md) |
-| :--- | :---: | :---: | :---: |
+| **TouriCN** | [主页](/profile/README.md) &nbsp; [文章](/posts) &nbsp; [友谊链接](/friends.md) |
+| :--- | ---: |
 <!-- NAV-END -->
 | 友谊链接 |
 |:-------|
@@ -18,7 +18,7 @@
 | <img src="https://realityandlord.net/wp-content/uploads/2026/03/cropped-TRUTH.png"> |
 
 <!-- BOTTOM-START -->
-*最后更新：2026-08-26 14:18 UTC*
+*最后更新：2026-08-26 14:20 UTC*
 
 > ###### ©2026 TouriCN|MIT License
 <!-- BOTTOM-END -->
