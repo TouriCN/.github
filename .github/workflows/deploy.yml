@@ -1,7 +1,9 @@
 name: 站点构建
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
+  workflow_dispatch:  # 保留手动触发，方便随时跑
 
 permissions:
   contents: write
@@ -10,10 +12,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout（含完整提交历史，用于取每文件最后编辑时间）
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0   # 必须：否则 git log 拿不到历史
 
       - name: 安装依赖
         run: pip install pyyaml
@@ -21,7 +24,7 @@ jobs:
       - name: 注入顶部导航 + 底部区域
         run: |
           python3 << 'EOF'
-          import yaml, glob, re, os, datetime
+          import yaml, glob, re, os, subprocess, datetime
 
           with open('nav.yml') as f:
               cfg = yaml.safe_load(f)
@@ -69,7 +72,20 @@ jobs:
               "<!-- NAV-END -->"
           )
 
-          now = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+          # 取某文件最后一次提交的作者时间（本地时区）
+          def last_edit_time(path):
+              try:
+                  out = subprocess.check_output(
+                      ['git', 'log', '-1', '--format=%aI', '--', path]
+                  ).decode().strip()
+                  if not out:
+                      return None
+                  # %aI 是 ISO 8601，带 Z 或 +hh:mm，转本地
+                  dt = datetime.datetime.fromisoformat(out.replace('Z', '+00:00'))
+                  local = dt.astimezone()
+                  return local.strftime('%Y-%m-%d %H:%M')
+              except Exception:
+                  return None
 
           files = glob.glob('*.md') + glob.glob('**/*.md', recursive=True)
 
@@ -85,7 +101,13 @@ jobs:
                   content = NAV + '\n\n' + content
 
               bottom = []
-              bottom.append(f'*最后更新：{now}*')
+
+              # 最后更新 = 该文件最后一次人工编辑提交的时间
+              edit_time = last_edit_time(path)
+              if edit_time:
+                  bottom.append(f'*最后更新：{edit_time}*')
+              else:
+                  bottom.append(f'*最后更新：—*')
               bottom.append('')
 
               if norm in file2group and norm not in exclude:
@@ -137,8 +159,18 @@ jobs:
           msg = git_log('%s')
           hash_short = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode().strip()
 
-          utc_now = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
-          build_time = utc_now.strftime('%Y/%m/%d %H:%M:%S')
+          # profile/README 自身最后编辑时间
+          try:
+              out = subprocess.check_output(
+                  ['git', 'log', '-1', '--format=%aI', '--', profile_path]
+              ).decode().strip()
+              if out:
+                  dt = datetime.datetime.fromisoformat(out.replace('Z', '+00:00')).astimezone()
+                  build_time = dt.strftime('%Y/%m/%d %H:%M:%S')
+              else:
+                  build_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime('%Y/%m/%d %H:%M:%S')
+          except Exception:
+              build_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime('%Y/%m/%d %H:%M:%S')
 
           files = [f for f in glob.glob('**/*.md', recursive=True)
                    if 'node_modules' not in f and '.git' not in f]
@@ -183,8 +215,6 @@ jobs:
 
       - name: Commit and Push
         run: |
-          git config user.name "TouriCN Bot"
-          git config user.email "bot@touricn.local"
           git add -A
           git diff --staged --quiet || git commit -m "build: update nav, bottom and site info"
           git push
