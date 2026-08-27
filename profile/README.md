@@ -1,6 +1,10 @@
 <!-- NAV-START -->
+<div align="center">
+
 | **TouriCN** | [主页](/profile/README.md) &nbsp; [文章](/posts) &nbsp; [友谊链接](/friends.md) |
 | :--- | ---: |
+
+</div>
 <!-- NAV-END -->
 | **TouriCN** |
 |:-------|
@@ -27,9 +31,9 @@
 <!-- SITE_INFO_END -->
 
 <!-- BOTTOM-START -->
-*最后更新：2026-08-27 09:49*
+*最后更新：2026-08-27 11:12*
 
-> <div align="center"><a href="https://github.com/TouriCN"><img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=+++++++全站浏览量++++++" /></a></div><br>(这可能是一种对于GitHub的新奇玩法)<br>©2026 TouriCN|MIT License
+<div align="center"><a href="https://github.com/TouriCN"><img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=+++++++全站浏览量++++++" /></a></div><br>(这可能是一种对于GitHub的新奇玩法)<br>©2026 TouriCN|MIT License
 <!-- BOTTOM-END -->
 
 
