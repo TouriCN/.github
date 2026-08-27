@@ -9,7 +9,7 @@
 
 <div align="center">
   <a href="https://github.com/TouriCN">
-    <img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=+++浏览量++" />
+    <img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=++++浏览量+++" />
 </div>
 
 | 哦，对了；我们还有一个《我的世界》服务器… |
