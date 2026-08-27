@@ -20,23 +20,24 @@
 
 | 字段 | 值 |
 | :---: | :---: |
-| 构建时间 | 2026/08/27 20:27:19 |
+| 构建时间 | 2026/08/27 20:28:21 |
 | 提交者 | TouriCN-Tourism |
 | 提交信息 | 更新 nav.yml |
-| 提交哈希 | 0514080 |
+| 提交哈希 | 21aaaed |
 | 文件数 | 9 |
-| 总字数 | 3448 |
-| 每文件平均字数 | 383 |
+| 总字数 | 3429 |
+| 每文件平均字数 | 381 |
 
 <!-- SITE_INFO_END -->
 
 <!-- BOTTOM-START -->
 ---
-<p><em>最后更新：2026-08-27 20:27</em></p>
+<p><em>最后更新：2026-08-27 20:28</em></p>
 <div align="center">
    <a href="https://github.com/TouriCN">
        <img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=+++++++全站浏览量++++++" /></a>
-</div><br> (这可能是一种对于GitHub的新奇玩法)<br> ###### ©2026 TouriCN|MIT License
+</div>
+(这可能是一种对于GitHub的新奇玩法) ###### ©2026 TouriCN|MIT License
 <!-- BOTTOM-END -->
 
 
