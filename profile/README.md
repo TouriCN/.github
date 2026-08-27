@@ -16,6 +16,9 @@
 | 你可以了解一下，就在这里 |
 | [进入GitHub仓库！](https://github.com/TouriCN/TouriCNParkOurMC) |
 <!-- SITE_INFO_START -->
+## 关于
+TouriCN是一个充满极客精神，坚持用最广为人知、最基础的东西去制作项目。<br>
+目前该工作室不招收人员。
 ## 站点信息
 
 | 字段 | 值 |
