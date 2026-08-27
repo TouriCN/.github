@@ -7,7 +7,7 @@
 | 史上最神人的团队。 |
 | 没有之一，并且你绝对想不到这个团队未来到底还能做什么 |
 
-![](https://komarev.com/ghpvc/?username=TouriCN&color=lightgrey)
+![](https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen)
 
 | 哦，对了；我们还有一个《我的世界》服务器… |
 |:-------------------:|
