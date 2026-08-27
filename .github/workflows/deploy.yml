@@ -3,7 +3,7 @@ name: Inject Navbar and Bottom
 on:
   push:
     branches: [ main ]
-    
+
   workflow_dispatch:
 
 permissions:
@@ -24,9 +24,16 @@ jobs:
         run: pip install pyyaml
 
       - name: Run inject
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
           python3 << 'EOF'
           import yaml, glob, re, os, subprocess, datetime
+          from urllib.parse import quote
+
+          OWNER = "TouriCN"
+          REPO  = "TouriCN"
+          BRANCH = os.environ.get("GITHUB_REF_NAME", "main")
 
           with open('nav.yml') as f:
               cfg = yaml.safe_load(f)
@@ -37,9 +44,43 @@ jobs:
           exclude = set(os.path.normpath(p) for p in (cfg.get('exclude') or []))
           bottom_text = (cfg.get('bottom') or '').strip()
 
+          # ========== 链接展开（所有链接必须经过这个函数） ==========
+          LINK_RE = re.compile(r'(!?\[)([^\]]*)\]\((\s*[^)\s][^)]*?\s*)\)')
+
+          def abs_link(source_md, target):
+              """把简化链接/相对路径展开为 https://github.com/... 绝对链接"""
+              target = target.strip()
+              if target.startswith(("http://", "https://", "mailto:", "tel:")):
+                  return target
+              if target.startswith("#"):
+                  return target
+              frag = ""
+              for sep in ("#", "?"):
+                  i = target.find(sep)
+                  if i != -1:
+                      frag = target[i:]
+                      target = target[:i]
+                      break
+              if target.startswith("/"):
+                  resolved = target.lstrip("/")
+              else:
+                  doc_dir = os.path.dirname(source_md)
+                  resolved = os.path.normpath(os.path.join(doc_dir or ".", target))
+              resolved = resolved.replace("\\", "/")
+              safe = quote(resolved, safe="/")
+              return f"https://github.com/{OWNER}/{REPO}/blob/{BRANCH}/{safe}{frag}"
+
+          def rewrite_links(text, source_md):
+              """把 .md 文件里所有 [text](link) 的 link 展开为绝对链接"""
+              def repl(m):
+                  prefix, label, raw = m.group(1), m.group(2), m.group(3)
+                  return f"{prefix}{label}]({abs_link(source_md, raw.strip())})"
+              return LINK_RE.sub(repl, text)
+          # ========================================================
+
+          # ---------- 扫描目录分组 ----------
           auto_groups = {}
           file2group = {}
-
           for scan_dir in scan_dirs:
               if not os.path.isdir(scan_dir):
                   continue
@@ -62,8 +103,9 @@ jobs:
                       for _, link in pages:
                           file2group[link] = gname
 
+          # ---------- 生成 Navbar（链接走 abs_link） ----------
           nav_links = " &nbsp; ".join(
-              f'<a href="{link}">{name}</a>'
+              f'<a href="{abs_link("README.md", link)}">{name}</a>'
               for item in navbar_items
               for name, link in [item.split(', ', 1)]
           )
@@ -85,8 +127,7 @@ jobs:
                   if not out:
                       return None
                   dt = datetime.datetime.fromisoformat(out.replace('Z', '+00:00'))
-                  local = dt.astimezone()
-                  return local.strftime('%Y-%m-%d %H:%M')
+                  return dt.astimezone().strftime('%Y-%m-%d %H:%M')
               except Exception:
                   return None
 
@@ -97,19 +138,20 @@ jobs:
               with open(path, 'r') as f:
                   content = f.read()
 
+              # 1) 文件里原有的 Markdown 链接全部展开为 https 绝对链接
+              content = rewrite_links(content, norm)
+
+              # 2) Navbar
               if '<!-- NAV-START -->' in content:
                   content = re.sub(r'<!-- NAV-START -->.*?<!-- NAV-END -->',
                                    NAV, content, flags=re.DOTALL)
               else:
                   content = NAV + '\n\n' + content
 
+              # 3) Bottom
               bottom = []
-
               edit_time = last_edit_time(path)
-              if edit_time:
-                  bottom.append(f'<p><em>最后更新：{edit_time}</em></p>')
-              else:
-                  bottom.append(f'<p><em>最后更新：—</em></p>')
+              bottom.append(f'<p><em>最后更新：{edit_time or "—"}</em></p>')
 
               if norm in file2group and norm not in exclude:
                   gname = file2group[norm]
@@ -119,7 +161,8 @@ jobs:
                       if link == norm:
                           lines.append(f"<strong>{title}</strong>（当前）")
                       else:
-                          lines.append(f'<a href="{link}">{title}</a>')
+                          # 目录表格里的链接也走 abs_link
+                          lines.append(f'<a href="{abs_link(norm, link)}">{title}</a>')
                   bottom.append('<div align="center">')
                   bottom.append(f'<table><tr><td><strong>{gname}</strong></td><td>{"<br>".join(lines)}</td></tr></table>')
                   bottom.append('</div>')
@@ -128,7 +171,6 @@ jobs:
                   bottom.append(bottom_text)
 
               BOTTOM = '<!-- BOTTOM-START -->\n' + '\n'.join(bottom) + '\n<!-- BOTTOM-END -->'
-
               if '<!-- BOTTOM-START -->' in content:
                   content = re.sub(r'<!-- BOTTOM-START -->.*?<!-- BOTTOM-END -->',
                                    BOTTOM, content, flags=re.DOTALL)
@@ -137,7 +179,6 @@ jobs:
 
               with open(path, 'w') as f:
                   f.write(content)
-
               print(f"done: {path}")
 
           print("navbar + bottom injected")
@@ -161,14 +202,12 @@ jobs:
           msg = git_log('%s')
           hash_short = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode().strip()
 
-          # profile/README 自身最后编辑时间
           try:
               out = subprocess.check_output(
                   ['git', 'log', '-1', '--format=%aI', '--', profile_path]
               ).decode().strip()
               if out:
-                  dt = datetime.datetime.fromisoformat(out.replace('Z', '+00:00')).astimezone()
-                  build_time = dt.strftime('%Y/%m/%d %H:%M:%S')
+                  build_time = datetime.datetime.fromisoformat(out.replace('Z', '+00:00')).astimezone().strftime('%Y/%m/%d %H:%M:%S')
               else:
                   build_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime('%Y/%m/%d %H:%M:%S')
           except Exception:
