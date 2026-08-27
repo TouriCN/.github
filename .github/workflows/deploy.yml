@@ -2,7 +2,7 @@ name: Inject Navbar and Bottom
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
 
   workflow_dispatch:
 
@@ -24,129 +24,130 @@ jobs:
         run: pip install pyyaml
 
       - name: Run inject
-        run: python3 << 'EOF'
-        import yaml, glob, re, os, subprocess, datetime
+        run: |
+          python3 << 'EOF'
+          import yaml, glob, re, os, subprocess, datetime
 
-        with open('nav.yml') as f:
-            cfg = yaml.safe_load(f)
+          with open('nav.yml') as f:
+              cfg = yaml.safe_load(f)
 
-        brand = cfg['brand']
-        navbar_items = cfg['navbar']
-        scan_dirs = cfg.get('scan_dirs', ['.'])
-        exclude = set(os.path.normpath(p) for p in (cfg.get('exclude') or []))
-        bottom_text = (cfg.get('bottom') or '').strip()
+          brand = cfg['brand']
+          navbar_items = cfg['navbar']
+          scan_dirs = cfg.get('scan_dirs', ['.'])
+          exclude = set(os.path.normpath(p) for p in (cfg.get('exclude') or []))
+          bottom_text = (cfg.get('bottom') or '').strip()
 
-        auto_groups = {}
-        file2group = {}
+          auto_groups = {}
+          file2group = {}
 
-        for scan_dir in scan_dirs:
-            if not os.path.isdir(scan_dir):
-                continue
-            for root, dirs, _ in os.walk(scan_dir):
-                if root == scan_dir:
-                    continue
-                gname = os.path.basename(root)
-                pages = []
-                for md in sorted(glob.glob(os.path.join(root, '*.md'))):
-                    with open(md, 'r') as mf:
-                        first = mf.readline().strip()
-                    if first.startswith('# '):
-                        title = first[2:].strip()
-                    else:
-                        title = os.path.splitext(os.path.basename(md))[0]
-                    rel_link = os.path.normpath(md).replace(os.sep, '/')
-                    pages.append((title, rel_link))
-                if pages:
-                    auto_groups[gname] = pages
-                    for _, link in pages:
-                        file2group[link] = gname
+          for scan_dir in scan_dirs:
+              if not os.path.isdir(scan_dir):
+                  continue
+              for root, dirs, _ in os.walk(scan_dir):
+                  if root == scan_dir:
+                      continue
+                  gname = os.path.basename(root)
+                  pages = []
+                  for md in sorted(glob.glob(os.path.join(root, '*.md'))):
+                      with open(md, 'r') as mf:
+                          first = mf.readline().strip()
+                      if first.startswith('# '):
+                          title = first[2:].strip()
+                      else:
+                          title = os.path.splitext(os.path.basename(md))[0]
+                      rel_link = os.path.normpath(md).replace(os.sep, '/')
+                      pages.append((title, rel_link))
+                  if pages:
+                      auto_groups[gname] = pages
+                      for _, link in pages:
+                          file2group[link] = gname
 
-        nav_links = " &nbsp; ".join(
-            f"[{name}]({link})"
-            for item in navbar_items
-            for name, link in [item.split(', ', 1)]
-        )
+          nav_links = " &nbsp; ".join(
+              f"[{name}]({link})"
+              for item in navbar_items
+              for name, link in [item.split(', ', 1)]
+          )
 
-        NAV = (
-            "<!-- NAV-START -->\n"
-            "<div align=\"center\">\n\n"
-            f"| **{brand}** | {nav_links} |\n"
-            "| :--- | ---: |\n\n"
-            "</div>\n"
-            "<!-- NAV-END -->"
-        )
+          NAV = (
+              "<!-- NAV-START -->\n"
+              "<div align=\"center\">\n\n"
+              f"| **{brand}** | {nav_links} |\n"
+              "| :--- | ---: |\n\n"
+              "</div>\n"
+              "<!-- NAV-END -->"
+          )
 
-        def last_edit_time(path):
-            try:
-                out = subprocess.check_output(
-                    ['git', 'log', '-1', '--format=%aI', '--', path]
-                ).decode().strip()
-                if not out:
-                    return None
-                dt = datetime.datetime.fromisoformat(out.replace('Z', '+00:00'))
-                local = dt.astimezone()
-                return local.strftime('%Y-%m-%d %H:%M')
-            except Exception:
-                return None
+          def last_edit_time(path):
+              try:
+                  out = subprocess.check_output(
+                      ['git', 'log', '-1', '--format=%aI', '--', path]
+                  ).decode().strip()
+                  if not out:
+                      return None
+                  dt = datetime.datetime.fromisoformat(out.replace('Z', '+00:00'))
+                  local = dt.astimezone()
+                  return local.strftime('%Y-%m-%d %H:%M')
+              except Exception:
+                  return None
 
-        files = glob.glob('*.md') + glob.glob('**/*.md', recursive=True)
+          files = glob.glob('*.md') + glob.glob('**/*.md', recursive=True)
 
-        for path in files:
-            norm = os.path.normpath(path).replace(os.sep, '/')
-            with open(path, 'r') as f:
-                content = f.read()
+          for path in files:
+              norm = os.path.normpath(path).replace(os.sep, '/')
+              with open(path, 'r') as f:
+                  content = f.read()
 
-            if '<!-- NAV-START -->' in content:
-                content = re.sub(r'<!-- NAV-START -->.*?<!-- NAV-END -->',
-                                 NAV, content, flags=re.DOTALL)
-            else:
-                content = NAV + '\n\n' + content
+              if '<!-- NAV-START -->' in content:
+                  content = re.sub(r'<!-- NAV-START -->.*?<!-- NAV-END -->',
+                                   NAV, content, flags=re.DOTALL)
+              else:
+                  content = NAV + '\n\n' + content
 
-            bottom = []
+              bottom = []
 
-            edit_time = last_edit_time(path)
-            if edit_time:
-                bottom.append(f'*最后更新：{edit_time}*')
-            else:
-                bottom.append(f'*最后更新：—*')
-            bottom.append('')
+              edit_time = last_edit_time(path)
+              if edit_time:
+                  bottom.append(f'*最后更新：{edit_time}*')
+              else:
+                  bottom.append(f'*最后更新：—*')
+              bottom.append('')
 
-            if norm in file2group and norm not in exclude:
-                gname = file2group[norm]
-                pages = auto_groups[gname]
-                lines = []
-                for title, link in pages:
-                    if link == norm:
-                        lines.append(f"- **{title}**（当前）")
-                    else:
-                        lines.append(f"- [{title}]({link})")
-                bottom.append('')
-                bottom.append('<div align="center">')
-                bottom.append('')
-                bottom.append(f"| **{gname}** | {'<br>'.join(lines)} |")
-                bottom.append("|---|---|")
-                bottom.append('')
-                bottom.append('</div>')
-                bottom.append('')
+              if norm in file2group and norm not in exclude:
+                  gname = file2group[norm]
+                  pages = auto_groups[gname]
+                  lines = []
+                  for title, link in pages:
+                      if link == norm:
+                          lines.append(f"- **{title}**（当前）")
+                      else:
+                          lines.append(f"- [{title}]({link})")
+                  bottom.append('')
+                  bottom.append('<div align="center">')
+                  bottom.append('')
+                  bottom.append(f"| **{gname}** | {'<br>'.join(lines)} |")
+                  bottom.append("|---|---|")
+                  bottom.append('')
+                  bottom.append('</div>')
+                  bottom.append('')
 
-            if bottom_text:
-                bottom.append(bottom_text)
+              if bottom_text:
+                  bottom.append(bottom_text)
 
-            BOTTOM = '<!-- BOTTOM-START -->\n' + '\n'.join(bottom) + '\n<!-- BOTTOM-END -->'
+              BOTTOM = '<!-- BOTTOM-START -->\n' + '\n'.join(bottom) + '\n<!-- BOTTOM-END -->'
 
-            if '<!-- BOTTOM-START -->' in content:
-                content = re.sub(r'<!-- BOTTOM-START -->.*?<!-- BOTTOM-END -->',
-                                 BOTTOM, content, flags=re.DOTALL)
-            else:
-                content = content.rstrip() + '\n\n' + BOTTOM
+              if '<!-- BOTTOM-START -->' in content:
+                  content = re.sub(r'<!-- BOTTOM-START -->.*?<!-- BOTTOM-END -->',
+                                   BOTTOM, content, flags=re.DOTALL)
+              else:
+                  content = content.rstrip() + '\n\n' + BOTTOM
 
-            with open(path, 'w') as f:
-                f.write(content)
+              with open(path, 'w') as f:
+                  f.write(content)
 
-            print(f"done: {path}")
+              print(f"done: {path}")
 
-        print("navbar + bottom injected")
-        EOF
+          print("navbar + bottom injected")
+          EOF
 
       - name: Commit and push
         run: |
