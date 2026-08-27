@@ -120,12 +120,16 @@ jobs:
           def last_edit_time(path):
               try:
                   out = subprocess.check_output(
-                      ['git', 'log', '-1', '--format=%aI', '--', path]
+                      ['git', 'log', '--format=%aI|%an', '--', path]
                   ).decode().strip()
                   if not out:
                       return None
-                  dt = datetime.datetime.fromisoformat(out.replace('Z', '+00:00'))
-                  return dt.astimezone().strftime('%Y-%m-%d %H:%M')
+                  for line in out.splitlines():
+                      date_str, author = line.split('|', 1)
+                      if 'github-actions' not in author.lower():
+                          dt = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                          return dt.astimezone().strftime('%Y-%m-%d %H:%M')
+                  return None
               except Exception:
                   return None
 
@@ -164,7 +168,6 @@ jobs:
               if bottom_text:
                   bottom.append(bottom_text)
 
-              # 👇 就改了这一行，加了 --- 分割线
               BOTTOM = '<!-- BOTTOM-START -->\n---\n' + '\n'.join(bottom) + '\n<!-- BOTTOM-END -->'
               if '<!-- BOTTOM-START -->' in content:
                   content = re.sub(r'<!-- BOTTOM-START -->.*?<!-- BOTTOM-END -->',
