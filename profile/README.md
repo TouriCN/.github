@@ -20,19 +20,19 @@
 
 | 字段 | 值 |
 | :---: | :---: |
-| 构建时间 | 2026/08/27 20:47:08 |
+| 构建时间 | 2026/08/27 20:50:57 |
 | 提交者 | TouriCN-Tourism |
-| 提交信息 | 更新 README.md |
-| 提交哈希 | 9901572 |
+| 提交信息 | 更新 deploy.yml |
+| 提交哈希 | 32f41d2 |
 | 文件数 | 9 |
-| 总字数 | 3473 |
-| 每文件平均字数 | 385 |
+| 总字数 | 3429 |
+| 每文件平均字数 | 381 |
 
 <!-- SITE_INFO_END -->
 
 <!-- BOTTOM-START -->
 ---
-<p><em>最后更新：2026-08-27 20:47</em></p>
+<p><em>最后更新：2026-08-27 20:50</em></p>
 <div align="center">
    <a href="https://github.com/TouriCN">
        <img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=+++++++全站浏览量++++++" /></a>
