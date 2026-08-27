@@ -1,8 +1,8 @@
 brand: TouriCN
 
 navbar:
-  - "主页, /profile/README.md"
-  - "文章, /posts"
+  - "主页, https://github.com/TouriCN"
+  - "文章, /posts/README.md"
   - "友谊链接, /friends.md"
 
 scan_dirs:
