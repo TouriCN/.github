@@ -1,222 +1,157 @@
-name: 站点构建
+name: Inject Navbar and Bottom
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # 保留手动触发，方便随时跑
+    
+workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  inject:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout（含完整提交历史，用于取每文件最后编辑时间）
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0   # 必须：否则 git log 拿不到历史
+      - uses: actions/checkout@v4
 
-      - name: 安装依赖
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
         run: pip install pyyaml
 
-      - name: 注入顶部导航 + 底部区域
-        run: |
-          python3 << 'EOF'
-          import yaml, glob, re, os, subprocess, datetime
+      - name: Run inject
+        run: python3 << 'EOF'
+        import yaml, glob, re, os, subprocess, datetime
 
-          with open('nav.yml') as f:
-              cfg = yaml.safe_load(f)
+        with open('nav.yml') as f:
+            cfg = yaml.safe_load(f)
 
-          brand = cfg['brand']
-          navbar_items = cfg['navbar']
-          scan_dirs = cfg.get('scan_dirs', ['.'])
-          exclude = set(os.path.normpath(p) for p in (cfg.get('exclude') or []))
-          bottom_text = (cfg.get('bottom') or '').strip()
+        brand = cfg['brand']
+        navbar_items = cfg['navbar']
+        scan_dirs = cfg.get('scan_dirs', ['.'])
+        exclude = set(os.path.normpath(p) for p in (cfg.get('exclude') or []))
+        bottom_text = (cfg.get('bottom') or '').strip()
 
-          auto_groups = {}
-          file2group = {}
+        auto_groups = {}
+        file2group = {}
 
-          for scan_dir in scan_dirs:
-              if not os.path.isdir(scan_dir):
-                  continue
-              for root, dirs, _ in os.walk(scan_dir):
-                  if root == scan_dir:
-                      continue
-                  gname = os.path.basename(root)
-                  pages = []
-                  for md in sorted(glob.glob(os.path.join(root, '*.md'))):
-                      with open(md, 'r') as mf:
-                          first = mf.readline().strip()
-                      if first.startswith('# '):
-                          title = first[2:].strip()
-                      else:
-                          title = os.path.splitext(os.path.basename(md))[0]
-                      rel_link = os.path.normpath(md).replace(os.sep, '/')
-                      pages.append((title, rel_link))
-                  if pages:
-                      auto_groups[gname] = pages
-                      for _, link in pages:
-                          file2group[link] = gname
+        for scan_dir in scan_dirs:
+            if not os.path.isdir(scan_dir):
+                continue
+            for root, dirs, _ in os.walk(scan_dir):
+                if root == scan_dir:
+                    continue
+                gname = os.path.basename(root)
+                pages = []
+                for md in sorted(glob.glob(os.path.join(root, '*.md'))):
+                    with open(md, 'r') as mf:
+                        first = mf.readline().strip()
+                    if first.startswith('# '):
+                        title = first[2:].strip()
+                    else:
+                        title = os.path.splitext(os.path.basename(md))[0]
+                    rel_link = os.path.normpath(md).replace(os.sep, '/')
+                    pages.append((title, rel_link))
+                if pages:
+                    auto_groups[gname] = pages
+                    for _, link in pages:
+                        file2group[link] = gname
 
-          nav_links = " &nbsp; ".join(
-              f"[{name}]({link})"
-              for item in navbar_items
-              for name, link in [item.split(', ', 1)]
-          )
-          NAV = (
-              "<!-- NAV-START -->\n"
-              f"| **{brand}** | {nav_links} |\n"
-              "| :--- | ---: |\n"
-              "<!-- NAV-END -->"
-          )
+        nav_links = " &nbsp; ".join(
+            f"[{name}]({link})"
+            for item in navbar_items
+            for name, link in [item.split(', ', 1)]
+        )
 
-          # 取某文件最后一次提交的作者时间（本地时区）
-          def last_edit_time(path):
-              try:
-                  out = subprocess.check_output(
-                      ['git', 'log', '-1', '--format=%aI', '--', path]
-                  ).decode().strip()
-                  if not out:
-                      return None
-                  # %aI 是 ISO 8601，带 Z 或 +hh:mm，转本地
-                  dt = datetime.datetime.fromisoformat(out.replace('Z', '+00:00'))
-                  local = dt.astimezone()
-                  return local.strftime('%Y-%m-%d %H:%M')
-              except Exception:
-                  return None
+        NAV = (
+            "<!-- NAV-START -->\n"
+            "<div align=\"center\">\n\n"
+            f"| **{brand}** | {nav_links} |\n"
+            "| :--- | ---: |\n\n"
+            "</div>\n"
+            "<!-- NAV-END -->"
+        )
 
-          files = glob.glob('*.md') + glob.glob('**/*.md', recursive=True)
+        def last_edit_time(path):
+            try:
+                out = subprocess.check_output(
+                    ['git', 'log', '-1', '--format=%aI', '--', path]
+                ).decode().strip()
+                if not out:
+                    return None
+                dt = datetime.datetime.fromisoformat(out.replace('Z', '+00:00'))
+                local = dt.astimezone()
+                return local.strftime('%Y-%m-%d %H:%M')
+            except Exception:
+                return None
 
-          for path in files:
-              norm = os.path.normpath(path).replace(os.sep, '/')
-              with open(path, 'r') as f:
-                  content = f.read()
+        files = glob.glob('*.md') + glob.glob('**/*.md', recursive=True)
 
-              if '<!-- NAV-START -->' in content:
-                  content = re.sub(r'<!-- NAV-START -->.*?<!-- NAV-END -->',
-                                   NAV, content, flags=re.DOTALL)
-              else:
-                  content = NAV + '\n\n' + content
+        for path in files:
+            norm = os.path.normpath(path).replace(os.sep, '/')
+            with open(path, 'r') as f:
+                content = f.read()
 
-              bottom = []
+            if '<!-- NAV-START -->' in content:
+                content = re.sub(r'<!-- NAV-START -->.*?<!-- NAV-END -->',
+                                 NAV, content, flags=re.DOTALL)
+            else:
+                content = NAV + '\n\n' + content
 
-              # 最后更新 = 该文件最后一次人工编辑提交的时间
-              edit_time = last_edit_time(path)
-              if edit_time:
-                  bottom.append(f'*最后更新：{edit_time}*')
-              else:
-                  bottom.append(f'*最后更新：—*')
-              bottom.append('')
+            bottom = []
 
-              if norm in file2group and norm not in exclude:
-                  gname = file2group[norm]
-                  pages = auto_groups[gname]
-                  lines = []
-                  for title, link in pages:
-                      if link == norm:
-                          lines.append(f"- **{title}**（当前）")
-                      else:
-                          lines.append(f"- [{title}]({link})")
-                  bottom.append(f"| **{gname}** | {'<br>'.join(lines)} |")
-                  bottom.append("|---|---|")
-                  bottom.append('')
+            edit_time = last_edit_time(path)
+            if edit_time:
+                bottom.append(f'*最后更新：{edit_time}*')
+            else:
+                bottom.append(f'*最后更新：—*')
+            bottom.append('')
 
-              if bottom_text:
-                  bottom.append(f"> {bottom_text}")
+            if norm in file2group and norm not in exclude:
+                gname = file2group[norm]
+                pages = auto_groups[gname]
+                lines = []
+                for title, link in pages:
+                    if link == norm:
+                        lines.append(f"- **{title}**（当前）")
+                    else:
+                        lines.append(f"- [{title}]({link})")
+                bottom.append('')
+                bottom.append('<div align="center">')
+                bottom.append('')
+                bottom.append(f"| **{gname}** | {'<br>'.join(lines)} |")
+                bottom.append("|---|---|")
+                bottom.append('')
+                bottom.append('</div>')
+                bottom.append('')
 
-              BOTTOM = '<!-- BOTTOM-START -->\n' + '\n'.join(bottom) + '\n<!-- BOTTOM-END -->'
+            if bottom_text:
+                bottom.append(bottom_text)
 
-              if '<!-- BOTTOM-START -->' in content:
-                  content = re.sub(r'<!-- BOTTOM-START -->.*?<!-- BOTTOM-END -->',
-                                   BOTTOM, content, flags=re.DOTALL)
-              else:
-                  content = content.rstrip() + '\n\n' + BOTTOM
+            BOTTOM = '<!-- BOTTOM-START -->\n' + '\n'.join(bottom) + '\n<!-- BOTTOM-END -->'
 
-              with open(path, 'w') as f:
-                  f.write(content)
-              print(f"done: {path}")
+            if '<!-- BOTTOM-START -->' in content:
+                content = re.sub(r'<!-- BOTTOM-START -->.*?<!-- BOTTOM-END -->',
+                                 BOTTOM, content, flags=re.DOTALL)
+            else:
+                content = content.rstrip() + '\n\n' + BOTTOM
 
-          print("navbar + bottom injected")
-          EOF
+            with open(path, 'w') as f:
+                f.write(content)
 
-      - name: 注入站点信息到 profile/README.md
-        run: |
-          python3 << 'EOF'
-          import re, glob, os, subprocess, datetime
+            print(f"done: {path}")
 
-          os.makedirs('profile', exist_ok=True)
-          profile_path = 'profile/README.md'
-          if not os.path.exists(profile_path):
-              with open(profile_path, 'w') as f:
-                  f.write('# TouriCN\n')
+        print("navbar + bottom injected")
+        EOF
 
-          def git_log(fmt):
-              return subprocess.check_output(['git', 'log', '-1', f'--format={fmt}']).decode().strip()
-
-          author = os.environ.get('GITHUB_ACTOR', git_log('%an'))
-          msg = git_log('%s')
-          hash_short = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode().strip()
-
-          # profile/README 自身最后编辑时间
-          try:
-              out = subprocess.check_output(
-                  ['git', 'log', '-1', '--format=%aI', '--', profile_path]
-              ).decode().strip()
-              if out:
-                  dt = datetime.datetime.fromisoformat(out.replace('Z', '+00:00')).astimezone()
-                  build_time = dt.strftime('%Y/%m/%d %H:%M:%S')
-              else:
-                  build_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime('%Y/%m/%d %H:%M:%S')
-          except Exception:
-              build_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime('%Y/%m/%d %H:%M:%S')
-
-          files = [f for f in glob.glob('**/*.md', recursive=True)
-                   if 'node_modules' not in f and '.git' not in f]
-          total_files = len(files)
-          total_words = 0
-          for f in files:
-              with open(f, 'r', encoding='utf-8') as mf:
-                  c = mf.read()
-              chinese = len(re.findall(r'[\u4e00-\u9fa5]', c))
-              english = len(re.findall(r'[a-zA-Z]+', c))
-              total_words += chinese + english
-          avg_words = total_words // total_files if total_files > 0 else 0
-
-          table = f"""<!-- SITE_INFO_START -->
-          ## 站点信息
-
-          | 字段 | 值 |
-          | :---: | :---: |
-          | 构建时间 | {build_time} |
-          | 提交者 | {author} |
-          | 提交信息 | {msg} |
-          | 提交哈希 | {hash_short} |
-          | 文件数 | {total_files} |
-          | 总字数 | {total_words} |
-          | 每文件平均字数 | {avg_words} |
-
-          <!-- SITE_INFO_END -->"""
-
-          with open(profile_path, 'r') as f:
-              c = f.read()
-
-          if '<!-- SITE_INFO_START -->' in c:
-              c = re.sub(r'<!-- SITE_INFO_START -->.*?<!-- SITE_INFO_END -->', table, c, flags=re.DOTALL)
-          else:
-              c = c.rstrip() + '\n\n' + table
-
-          with open(profile_path, 'w') as f:
-              f.write(c)
-
-          print("site info injected")
-          EOF
-
-      - name: Commit and Push
+      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --staged --quiet || git commit -m "build: update nav, bottom and site info"
+          git diff --cached --quiet || git commit -m "chore: inject navbar and bottom [skip ci]"
           git push
