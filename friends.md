@@ -1,7 +1,7 @@
 <!-- NAV-START -->
 <div align="center">
 
-<table><tr><td><strong>TouriCN</strong></td><td><a href="https://github.com/TouriCN/TouriCN/blob/main/profile/README.md">主页</a> &nbsp; <a href="https://github.com/TouriCN/TouriCN/blob/main/posts">文章</a> &nbsp; <a href="https://github.com/TouriCN/TouriCN/blob/main/friends.md">友谊链接</a></td></tr></table>
+<table><tr><td><strong>TouriCN</strong></td><td><a href="https://github.com/TouriCN">主页</a> &nbsp; <a href="https://github.com/TouriCN/TouriCN/blob/main/posts/README.md">文章</a> &nbsp; <a href="https://github.com/TouriCN/TouriCN/blob/main/friends.md">友谊链接</a></td></tr></table>
 
 </div>
 <!-- NAV-END -->
@@ -21,7 +21,7 @@
 | <img src="https://realityandlord.net/wp-content/uploads/2026/03/cropped-TRUTH.png"> |
 
 <!-- BOTTOM-START -->
-<p><em>最后更新：2026-08-27 11:38</em></p>
+<p><em>最后更新：2026-08-27 11:41</em></p>
 <div align="center"><a href="https://github.com/TouriCN"><img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=+++++++全站浏览量++++++" /></a></div><br>(这可能是一种对于GitHub的新奇玩法)<br>©2026 TouriCN|MIT License
 <!-- BOTTOM-END -->
 
