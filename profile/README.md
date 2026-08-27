@@ -8,10 +8,9 @@
 | 没有之一，并且你绝对想不到这个团队未来到底还能做什么 |
 
 <div align="center">
-  <a href="https://github.com/TouriCN
+  <a href="https://github.com/TouriCN">
     <img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=浏览量" />
 </div>
-
 
 | 哦，对了；我们还有一个《我的世界》服务器… |
 |:-------------------:|
