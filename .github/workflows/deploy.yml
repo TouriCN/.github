@@ -2,8 +2,10 @@ name: Inject Navbar and Bottom
 
 on:
   push:
-    branches: [ main ]
-
+    branches: [ main, master ]
+    paths:
+      - '**.md'
+      - 'nav.yml'
   workflow_dispatch:
 
 permissions:
@@ -63,7 +65,7 @@ jobs:
                           file2group[link] = gname
 
           nav_links = " &nbsp; ".join(
-              f"[{name}]({link})"
+              f'<a href="{link}">{name}</a>'
               for item in navbar_items
               for name, link in [item.split(', ', 1)]
           )
@@ -71,8 +73,8 @@ jobs:
           NAV = (
               "<!-- NAV-START -->\n"
               "<div align=\"center\">\n\n"
-              f"| **{brand}** | {nav_links} |\n"
-              "| :--- | ---: |\n\n"
+              f"<table><tr><td><strong>{brand}</strong></td>"
+              f"<td>{nav_links}</td></tr></table>\n\n"
               "</div>\n"
               "<!-- NAV-END -->"
           )
@@ -107,10 +109,9 @@ jobs:
 
               edit_time = last_edit_time(path)
               if edit_time:
-                  bottom.append(f'*最后更新：{edit_time}*')
+                  bottom.append(f'<p><em>最后更新：{edit_time}</em></p>')
               else:
-                  bottom.append(f'*最后更新：—*')
-              bottom.append('')
+                  bottom.append(f'<p><em>最后更新：—</em></p>')
 
               if norm in file2group and norm not in exclude:
                   gname = file2group[norm]
@@ -118,17 +119,12 @@ jobs:
                   lines = []
                   for title, link in pages:
                       if link == norm:
-                          lines.append(f"- **{title}**（当前）")
+                          lines.append(f"<strong>{title}</strong>（当前）")
                       else:
-                          lines.append(f"- [{title}]({link})")
-                  bottom.append('')
+                          lines.append(f'<a href="{link}">{title}</a>')
                   bottom.append('<div align="center">')
-                  bottom.append('')
-                  bottom.append(f"| **{gname}** | {'<br>'.join(lines)} |")
-                  bottom.append("|---|---|")
-                  bottom.append('')
+                  bottom.append(f'<table><tr><td><strong>{gname}</strong></td><td>{"<br>".join(lines)}</td></tr></table>')
                   bottom.append('</div>')
-                  bottom.append('')
 
               if bottom_text:
                   bottom.append(bottom_text)
@@ -147,6 +143,78 @@ jobs:
               print(f"done: {path}")
 
           print("navbar + bottom injected")
+          EOF
+
+      - name: 注入站点信息到 profile/README.md
+        run: |
+          python3 << 'EOF'
+          import re, glob, os, subprocess, datetime
+
+          os.makedirs('profile', exist_ok=True)
+          profile_path = 'profile/README.md'
+          if not os.path.exists(profile_path):
+              with open(profile_path, 'w') as f:
+                  f.write('# TouriCN\n')
+
+          def git_log(fmt):
+              return subprocess.check_output(['git', 'log', '-1', f'--format={fmt}']).decode().strip()
+
+          author = os.environ.get('GITHUB_ACTOR', git_log('%an'))
+          msg = git_log('%s')
+          hash_short = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode().strip()
+
+          # profile/README 自身最后编辑时间
+          try:
+              out = subprocess.check_output(
+                  ['git', 'log', '-1', '--format=%aI', '--', profile_path]
+              ).decode().strip()
+              if out:
+                  dt = datetime.datetime.fromisoformat(out.replace('Z', '+00:00')).astimezone()
+                  build_time = dt.strftime('%Y/%m/%d %H:%M:%S')
+              else:
+                  build_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime('%Y/%m/%d %H:%M:%S')
+          except Exception:
+              build_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).strftime('%Y/%m/%d %H:%M:%S')
+
+          files = [f for f in glob.glob('**/*.md', recursive=True)
+                   if 'node_modules' not in f and '.git' not in f]
+          total_files = len(files)
+          total_words = 0
+          for f in files:
+              with open(f, 'r', encoding='utf-8') as mf:
+                  c = mf.read()
+              chinese = len(re.findall(r'[\u4e00-\u9fa5]', c))
+              english = len(re.findall(r'[a-zA-Z]+', c))
+              total_words += chinese + english
+          avg_words = total_words // total_files if total_files > 0 else 0
+
+          table = f"""<!-- SITE_INFO_START -->
+          ## 站点信息
+
+          | 字段 | 值 |
+          | :---: | :---: |
+          | 构建时间 | {build_time} |
+          | 提交者 | {author} |
+          | 提交信息 | {msg} |
+          | 提交哈希 | {hash_short} |
+          | 文件数 | {total_files} |
+          | 总字数 | {total_words} |
+          | 每文件平均字数 | {avg_words} |
+
+          <!-- SITE_INFO_END -->"""
+
+          with open(profile_path, 'r') as f:
+              c = f.read()
+
+          if '<!-- SITE_INFO_START -->' in c:
+              c = re.sub(r'<!-- SITE_INFO_START -->.*?<!-- SITE_INFO_END -->', table, c, flags=re.DOTALL)
+          else:
+              c = c.rstrip() + '\n\n' + table
+
+          with open(profile_path, 'w') as f:
+              f.write(c)
+
+          print("site info injected")
           EOF
 
       - name: Commit and push
