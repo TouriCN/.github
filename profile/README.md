@@ -16,26 +16,23 @@
 | 你可以了解一下，就在这里 |
 | [进入GitHub仓库！](https://github.com/TouriCN/TouriCNParkOurMC) |
 <!-- SITE_INFO_START -->
-## 关于
-TouriCN是一个充满极客精神，坚持用最广为人知、最基础的东西去制作项目。<br>
-目前该工作室不招收人员。
 ## 站点信息
 
 | 字段 | 值 |
 | :---: | :---: |
-| 构建时间 | 2026/08/27 20:32:37 |
+| 构建时间 | 2026/08/27 20:47:08 |
 | 提交者 | TouriCN-Tourism |
-| 提交信息 | 更新 nav.yml |
-| 提交哈希 | bfc3857 |
+| 提交信息 | 更新 README.md |
+| 提交哈希 | 9901572 |
 | 文件数 | 9 |
-| 总字数 | 3430 |
-| 每文件平均字数 | 381 |
+| 总字数 | 3473 |
+| 每文件平均字数 | 385 |
 
 <!-- SITE_INFO_END -->
 
 <!-- BOTTOM-START -->
 ---
-<p><em>最后更新：2026-08-27 20:32</em></p>
+<p><em>最后更新：2026-08-27 20:47</em></p>
 <div align="center">
    <a href="https://github.com/TouriCN">
        <img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=+++++++全站浏览量++++++" /></a>
