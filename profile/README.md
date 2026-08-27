@@ -15,6 +15,9 @@
 |:-------------------:|
 | 你可以了解一下，就在这里 |
 | [进入GitHub仓库！](https://github.com/TouriCN/TouriCNParkOurMC) |
+## 关于
+TouriCN是一个坚持用互联网的基础设施制作项目的团队。<br>
+该团队目前不打算招人，仅有团长[【Tourism】](https://github.com/TouriCN-Tourism)在制作。
 <!-- SITE_INFO_START -->
 ## 站点信息
 
