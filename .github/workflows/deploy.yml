@@ -2,8 +2,10 @@ name: Inject Navbar and Bottom
 
 on:
   push:
-    branches: [ main ]
-
+    branches: [ main, master ]
+    paths:
+      - '**.md'
+      - 'nav.yml'
   workflow_dispatch:
 
 permissions:
@@ -29,6 +31,7 @@ jobs:
         run: |
           python3 << 'EOF'
           import yaml, glob, re, os, subprocess, datetime
+          import posixpath
           from urllib.parse import quote
 
           OWNER = "TouriCN"
@@ -44,7 +47,7 @@ jobs:
           exclude = set(os.path.normpath(p) for p in (cfg.get('exclude') or []))
           bottom_text = (cfg.get('bottom') or '').strip()
 
-          # ========== 链接展开（所有链接必须经过这个函数） ==========
+          # ========== 链接展开（修复版，不再重复拼接） ==========
           LINK_RE = re.compile(r'(!?\[)([^\]]*)\]\((\s*[^)\s][^)]*?\s*)\)')
 
           def abs_link(source_md, target):
@@ -61,13 +64,20 @@ jobs:
                       frag = target[i:]
                       target = target[:i]
                       break
+              # 仓库根相对：/posts/a.md -> posts/a.md
               if target.startswith("/"):
-                  resolved = target.lstrip("/")
+                  resolved = target[1:]
               else:
-                  doc_dir = os.path.dirname(source_md)
-                  resolved = os.path.normpath(os.path.join(doc_dir or ".", target))
-              resolved = resolved.replace("\\", "/")
+                  # 相对当前文件所在目录
+                  doc_dir = posixpath.dirname(source_md) if source_md else ""
+                  resolved = posixpath.join(doc_dir, target)
+              resolved = posixpath.normpath(resolved).replace("\\", "/")
+              # normpath 可能把空路径或 ./ 归一成 "."，不能拼进 URL
+              if resolved == "." or resolved == "":
+                  resolved = ""
               safe = quote(resolved, safe="/")
+              if not safe:
+                  return target  # 实在解析不出就原样返回，不拼错
               return f"https://github.com/{OWNER}/{REPO}/blob/{BRANCH}/{safe}{frag}"
 
           def rewrite_links(text, source_md):
@@ -161,7 +171,6 @@ jobs:
                       if link == norm:
                           lines.append(f"<strong>{title}</strong>（当前）")
                       else:
-                          # 目录表格里的链接也走 abs_link
                           lines.append(f'<a href="{abs_link(norm, link)}">{title}</a>')
                   bottom.append('<div align="center">')
                   bottom.append(f'<table><tr><td><strong>{gname}</strong></td><td>{"<br>".join(lines)}</td></tr></table>')
