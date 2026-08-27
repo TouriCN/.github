@@ -3,7 +3,6 @@ name: Inject Navbar and Bottom
 on:
   push:
     branches: [ main ]
-    
   workflow_dispatch:
 
 permissions:
@@ -45,11 +44,9 @@ jobs:
           exclude = set(os.path.normpath(p) for p in (cfg.get('exclude') or []))
           bottom_text = (cfg.get('bottom') or '').strip()
 
-          # ========== 链接展开（修复版，不再重复拼接） ==========
           LINK_RE = re.compile(r'(!?\[)([^\]]*)\]\((\s*[^)\s][^)]*?\s*)\)')
 
           def abs_link(source_md, target):
-              """把简化链接/相对路径展开为 https://github.com/... 绝对链接"""
               target = target.strip()
               if target.startswith(("http://", "https://", "mailto:", "tel:")):
                   return target
@@ -62,31 +59,25 @@ jobs:
                       frag = target[i:]
                       target = target[:i]
                       break
-              # 仓库根相对：/posts/a.md -> posts/a.md
               if target.startswith("/"):
                   resolved = target[1:]
               else:
-                  # 相对当前文件所在目录
                   doc_dir = posixpath.dirname(source_md) if source_md else ""
                   resolved = posixpath.join(doc_dir, target)
               resolved = posixpath.normpath(resolved).replace("\\", "/")
-              # normpath 可能把空路径或 ./ 归一成 "."，不能拼进 URL
               if resolved == "." or resolved == "":
                   resolved = ""
               safe = quote(resolved, safe="/")
               if not safe:
-                  return target  # 实在解析不出就原样返回，不拼错
+                  return target
               return f"https://github.com/{OWNER}/{REPO}/blob/{BRANCH}/{safe}{frag}"
 
           def rewrite_links(text, source_md):
-              """把 .md 文件里所有 [text](link) 的 link 展开为绝对链接"""
               def repl(m):
                   prefix, label, raw = m.group(1), m.group(2), m.group(3)
                   return f"{prefix}{label}]({abs_link(source_md, raw.strip())})"
               return LINK_RE.sub(repl, text)
-          # ========================================================
 
-          # ---------- 扫描目录分组 ----------
           auto_groups = {}
           file2group = {}
           for scan_dir in scan_dirs:
@@ -111,9 +102,8 @@ jobs:
                       for _, link in pages:
                           file2group[link] = gname
 
-          # ---------- 生成 Navbar（链接走 abs_link） ----------
           nav_links = " &nbsp; ".join(
-              f'<a href="{abs_link("README.md", link)}">{name}</a>'
+              f'<a href="{abs_link("", link)}">{name}</a>'
               for item in navbar_items
               for name, link in [item.split(', ', 1)]
           )
@@ -146,17 +136,14 @@ jobs:
               with open(path, 'r') as f:
                   content = f.read()
 
-              # 1) 文件里原有的 Markdown 链接全部展开为 https 绝对链接
               content = rewrite_links(content, norm)
 
-              # 2) Navbar
               if '<!-- NAV-START -->' in content:
                   content = re.sub(r'<!-- NAV-START -->.*?<!-- NAV-END -->',
                                    NAV, content, flags=re.DOTALL)
               else:
                   content = NAV + '\n\n' + content
 
-              # 3) Bottom
               bottom = []
               edit_time = last_edit_time(path)
               bottom.append(f'<p><em>最后更新：{edit_time or "—"}</em></p>')
@@ -169,7 +156,7 @@ jobs:
                       if link == norm:
                           lines.append(f"<strong>{title}</strong>（当前）")
                       else:
-                          lines.append(f'<a href="{abs_link(norm, link)}">{title}</a>')
+                          lines.append(f'<a href="{abs_link("", link)}">{title}</a>')
                   bottom.append('<div align="center">')
                   bottom.append(f'<table><tr><td><strong>{gname}</strong></td><td>{"<br>".join(lines)}</td></tr></table>')
                   bottom.append('</div>')
