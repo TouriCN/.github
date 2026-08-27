@@ -164,7 +164,8 @@ jobs:
               if bottom_text:
                   bottom.append(bottom_text)
 
-              BOTTOM = '<!-- BOTTOM-START -->\n' + '\n'.join(bottom) + '\n<!-- BOTTOM-END -->'
+              # 👇 就改了这一行，加了 --- 分割线
+              BOTTOM = '<!-- BOTTOM-START -->\n---\n' + '\n'.join(bottom) + '\n<!-- BOTTOM-END -->'
               if '<!-- BOTTOM-START -->' in content:
                   content = re.sub(r'<!-- BOTTOM-START -->.*?<!-- BOTTOM-END -->',
                                    BOTTOM, content, flags=re.DOTALL)
