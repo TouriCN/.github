@@ -7,10 +7,11 @@
 | 史上最神人的团队。 |
 | 没有之一，并且你绝对想不到这个团队未来到底还能做什么 |
 
-<div style="position: relative; display: inline-block;">
-  <img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen" alt="visitors"/>
-  <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
+<div align="center">
+  <a href="https://github.com/TouriCN
+    <img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=浏览量" />
 </div>
+
 
 | 哦，对了；我们还有一个《我的世界》服务器… |
 |:-------------------:|
