@@ -23,25 +23,26 @@ TouriCN是一个坚持用互联网的基础设施制作项目的团队。<br>
 
 | 字段 | 值 |
 | :---: | :---: |
-| 构建时间 | 2026/08/28 01:30:58 |
+| 构建时间 | 2026/08/28 01:34:00 |
 | 提交者 | TouriCN-Tourism |
 | 提交信息 | 更新 nav.yml |
-| 提交哈希 | 43a2ee4 |
+| 提交哈希 | 4cbdba6 |
 | 文件数 | 10 |
-| 总字数 | 3917 |
-| 每文件平均字数 | 391 |
+| 总字数 | 4116 |
+| 每文件平均字数 | 411 |
 
 <!-- SITE_INFO_END -->
 
 <!-- BOTTOM-START -->
 ---
-<p><em>最后更新：2026-08-28 01:30</em></p>
+<p><em>最后更新：2026-08-28 01:34</em></p>
 <div align="center">
    <a href="https://github.com/TouriCN">
        <img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=+++++++全站浏览量++++++" /></a>
 </div>
 
-(这可能是一种对于GitHub的新奇玩法)
+(这可能是一种对于GitHub的新奇玩法
+哦，对了，时间写的都是老美那边的；自己+8小时即可)
 ###### ©2026 TouriCN|MIT License
 <!-- BOTTOM-END -->
 
