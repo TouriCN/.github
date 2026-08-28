@@ -1,7 +1,7 @@
 <!-- NAV-START -->
 <div align="center">
 
-<table><tr><td><strong>TouriCN</strong></td><td><a href="https://github.com/TouriCN">主页</a> &nbsp; <a href="https://github.com/TouriCN/TouriCN/blob/main/posts/README.md">文章</a> &nbsp; <a href="https://github.com/TouriCN/TouriCN/blob/main/friends.md">友谊链接</a> &nbsp; <a href="https://github.com/TouriCN/TouriCN/blob/main/sponsor.md">赞助我们</a></td></tr></table>
+<table><tr><td><strong>TouriCN</strong></td><td><a href="https://github.com/TouriCN">主页</a> &nbsp; <a href="https://github.com/TouriCN/.github/blob/main/posts/README.md">文章</a> &nbsp; <a href="https://github.com/TouriCN/.github/blob/main/friends.md">友谊链接</a> &nbsp; <a href="https://github.com/TouriCN/.github/blob/main/sponsor.md">赞助我们</a></td></tr></table>
 
 </div>
 <!-- NAV-END -->
@@ -23,19 +23,19 @@ TouriCN是一个坚持用互联网的基础设施制作项目的团队。<br>
 
 | 字段 | 值 |
 | :---: | :---: |
-| 构建时间 | 2026/08/28 23:46:03 |
+| 构建时间 | 2026/08/28 23:46:15 |
 | 提交者 | TouriCN-Tourism |
-| 提交信息 | 更新 friends.md |
-| 提交哈希 | c2f1c40 |
+| 提交信息 | 更新 deploy.yml |
+| 提交哈希 | 3921e54 |
 | 文件数 | 10 |
-| 总字数 | 4136 |
+| 总字数 | 4137 |
 | 每文件平均字数 | 413 |
 
 <!-- SITE_INFO_END -->
 
 <!-- BOTTOM-START -->
 ---
-<p><em>最后更新：2026-08-28 23:46</em></p>
+<p><em>最后更新：2026-08-27 20:55</em></p>
 <div align="center">
    <a href="https://github.com/TouriCN">
        <img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=+++++++全站浏览量++++++" /></a>
