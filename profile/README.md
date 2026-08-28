@@ -23,19 +23,19 @@ TouriCN是一个坚持用互联网的基础设施制作项目的团队。<br>
 
 | 字段 | 值 |
 | :---: | :---: |
-| 构建时间 | 2026/08/28 01:17:59 |
+| 构建时间 | 2026/08/28 01:29:41 |
 | 提交者 | TouriCN-Tourism |
-| 提交信息 | 创建 sponsor.md |
-| 提交哈希 | 9f63e0d |
+| 提交信息 | 更新 sponsor.md |
+| 提交哈希 | c33e49d |
 | 文件数 | 10 |
-| 总字数 | 3649 |
-| 每文件平均字数 | 364 |
+| 总字数 | 3747 |
+| 每文件平均字数 | 374 |
 
 <!-- SITE_INFO_END -->
 
 <!-- BOTTOM-START -->
 ---
-<p><em>最后更新：2026-08-28 01:17</em></p>
+<p><em>最后更新：2026-08-28 01:29</em></p>
 <div align="center">
    <a href="https://github.com/TouriCN">
        <img src="https://komarev.com/ghpvc/?username=TouriCN&color=brightgreen&label=+++++++全站浏览量++++++" /></a>
