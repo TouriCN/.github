@@ -259,5 +259,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "chore: inject navbar and bottom [skip ci]"
-          git push
+          if ! git diff --cached --quiet; then
+            PREV_MSG="$(git log --format='%an|%s' | grep -Eiv 'github-actions|\[bot\]' | head -1 | sed 's/^[^|]*|//' | head -c 100)"
+            if [ -z "$PREV_MSG" ]; then
+              PREV_MSG="manual update"
+            fi
+            git commit -m "inject: ${PREV_MSG} [skip ci]"
+            git push
+          fi
